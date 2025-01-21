@@ -243,6 +243,21 @@ export async function api_comment_on_issue(octokit: Octokit, issue: Issue, comme
 	return res.status == 201;
 }
 
+export async function api_set_labels_on_issue(octokit: Octokit, issue: Issue, labels: string[]) {
+	if (issue.repo == null) return;
+	const res = await octokit.request('PUT /repos/{owner}/{repo}/issues/{issue_number}/labels', {
+		owner: issue.repo?.owner,
+		repo: issue.repo?.name,
+		issue_number: issue.number,
+		labels: labels,
+		headers: {
+			'X-GitHub-Api-Version': '2022-11-28'
+		}
+	})
+
+	return res.status == 200;
+}
+
 /**
  * Updates an issue
  * @param octokit

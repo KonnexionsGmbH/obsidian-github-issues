@@ -7,7 +7,9 @@ import {
 	api_comment_on_issue,
 	api_get_issue_comments,
 	api_get_issue_details,
-	api_update_issue
+	api_update_issue,
+	api_get_labels,
+	api_set_labels_on_issue
 } from "../../API/ApiHandler";
 import { updateIssues } from "../../Issues/IssueUpdater";
 import { getTextColor } from "../../Utils/Color.utils";
@@ -81,7 +83,57 @@ export class IssuesDetailsModal extends Modal {
 			}
 		}
 
+		// Add Edit Labels button
+		const editLabelsButton = contentEl.createEl("button", { text: "Edit Labels" });
+		editLabelsButton.classList.add("issues-edit-labels-button");
 
+		const labelsDropdown = contentEl.createDiv();
+		labelsDropdown.classList.add("issues-labels-dropdown");
+		labelsDropdown.style.display = "none"; // Initially hidden
+
+		// Fetch all available labels (assuming you have an API method for this)
+		if (this.issue.repo != null) {
+			const allLabels = await api_get_labels(this.octokit, this.issue.repo);
+			allLabels.forEach(label => {
+				const labelCheckbox = labelsDropdown.createEl("input", { type: "checkbox", value: label.name });
+				labelCheckbox.checked = details.labels.some(issueLabel => issueLabel.name === label.name);
+				const labelLabel = labelsDropdown.createEl("label", { text: label.name });
+				labelLabel.htmlFor = label.name;
+				labelsDropdown.createEl("br");
+			});
+
+			editLabelsButton.onclick = () => {
+				labelsDropdown.style.display = labelsDropdown.style.display === "none" ? "block" : "none";
+			};
+
+			contentEl.appendChild(editLabelsButton);
+			contentEl.appendChild(labelsDropdown);
+
+			// Add Save Labels button
+			const saveLabelsButton = contentEl.createEl("button", { text: "Save Labels" });
+			saveLabelsButton.classList.add("issues-save-labels-button");
+			saveLabelsButton.style.display = "none"; // Initially hidden
+
+			saveLabelsButton.onclick = async () => {
+				const selectedLabels = Array.from(labelsDropdown.querySelectorAll("input:checked")).map((checkbox: HTMLInputElement) => checkbox.value);
+				console.log(selectedLabels);
+				const updated = await api_set_labels_on_issue(this.octokit, this.issue, selectedLabels);
+				if (updated) {
+					new Notice("Labels updated");
+					this.close();
+				} else {
+					new Notice("Could not update labels");
+				}
+			};
+
+			contentEl.appendChild(saveLabelsButton);
+
+			// Show Save Labels button when dropdown is visible
+			editLabelsButton.onclick = () => {
+				labelsDropdown.style.display = labelsDropdown.style.display === "none" ? "block" : "none";
+				saveLabelsButton.style.display = labelsDropdown.style.display === "none" ? "none" : "block";
+			};
+		}
 
 		if (details.assignee.login != undefined) {
 			const assigneeContainer = contentEl.createDiv();
