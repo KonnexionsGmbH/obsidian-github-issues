@@ -30,15 +30,31 @@ export function createDefaultIssueElement(
 		)} by ${issue.author}`,
 	});
 	detailsText.classList.add("issue-details-text");
-
 	const labelContainer = title.createDiv({ cls: "label-container" });
-	issue.labels.forEach((label) => {
+	issue.feature_labels.forEach((label) => {
 		const labelEl = labelContainer.createDiv({ cls: "label" });
 		labelEl.style.backgroundColor = `#${label.color}`;
 		labelEl.style.color = getTextColor(label.color);
 		labelEl.innerText = label.name;
 		labelEl.classList.add("labelEl");
 	});
+	
+	issue.normal_labels.forEach((label) => {
+		const labelEl = labelContainer.createDiv({ cls: "label" });
+		labelEl.style.backgroundColor = `#${label.color}`;
+		labelEl.style.color = getTextColor(label.color);
+		labelEl.innerText = label.name;
+		labelEl.classList.add("labelEl");
+	});
+	
+	issue.platform_labels.forEach((label) => {
+		const labelEl = labelContainer.createDiv({ cls: "label" });
+		labelEl.style.backgroundColor = `#${label.color}`;
+		labelEl.style.color = getTextColor(label.color);
+		labelEl.innerText = label.name;
+		labelEl.classList.add("labelEl");
+	});
+	
 
 	container.addEventListener("mouseenter", () => {
 		container.style.opacity = "0.7";

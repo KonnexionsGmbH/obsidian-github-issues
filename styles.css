@@ -49,6 +49,13 @@
 }
 
 /* Issue Details Modal Stuff */
+
+.issues-repo {
+	margin: 5px 0 0;
+	padding: 0;
+	opacity: 0.7;
+}
+
 .issues-author {
 	margin: 5px 0 0;
 	padding: 0;
@@ -170,6 +177,25 @@
 
 .issues-comment-body img {
 	max-width: 100%;
+}
+
+.issues-title-text {
+	margin: 0;
+	padding: 0;
+	font-size: 2.0em;
+	white-space: pre-wrap;
+}
+
+.issues-title-input {
+	margin-top: 30px;
+	width: 100%;
+	height: 60px;
+	max-width: 100%;
+	min-width: 100%;
+	max-height: 200px;
+	min-height: 30px;
+	border-radius: var(--radius-s);
+	font-size: 1.2em;
 }
 
 .issues-comments-container {

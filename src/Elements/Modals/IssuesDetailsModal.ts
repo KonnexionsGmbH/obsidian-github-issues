@@ -28,13 +28,20 @@ export class IssuesDetailsModal extends Modal {
 
 	async onOpen() {
 		const { contentEl } = this;
-		const title = contentEl.createEl("h2", { text: this.issue.title + " • #" + this.issue.number });
-		title.style.margin = "0";
 
+		const titleInput = contentEl.createEl("textarea", { text: this.issue.title });
+		titleInput.classList.add("issues-title-input");
+
+		const repoAndStuff = contentEl.createSpan({
+			text:  this.issue.repo?.name + ` issue #` + this.issue.number
+		});
+		repoAndStuff.classList.add("issues-repo")
+
+		contentEl.createEl("br");
 		const authorAndSutff = contentEl.createSpan({
 			text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
 		});
-		authorAndSutff.classList.add("issues-auhtor")
+		authorAndSutff.classList.add("issues-author")
 
 		contentEl.createEl("br");
 		const issueLink = contentEl.createEl("a", { text: "View on GitHub" });
@@ -69,50 +76,37 @@ export class IssuesDetailsModal extends Modal {
 
 		const labels = stateAndLabelsContainer.createDiv();
 		labels.classList.add("issues-labels")
-		if (details?.labels.length > 0) {
-			//loop through the labels
-			// eslint-disable-next-line no-unsafe-optional-chaining
-			for (const label of details?.labels) {
-				const labelPill = labels.createDiv();
-				labelPill.classList.add("issues-label-pill")
-				labelPill.style.background = "#" + label.color;
-
-				const labelName = labelPill.createEl("span", { text: label.name });
-				labelName.classList.add("issues-label-name")
-				labelName.style.color = getTextColor(label.color);
-			}
+		//loop through the labels
+		// eslint-disable-next-line no-unsafe-optional-chaining
+		for (const label of details?.labels) {
+			const labelPill = labels.createDiv();
+			labelPill.classList.add("issues-label-pill")
+			labelPill.style.background = "#" + label.color;
+			const labelName = labelPill.createEl("span", { text: label.name });
+			labelName.classList.add("issues-label-name")
+			labelName.style.color = getTextColor(label.color);
 		}
-
-		// Add Edit Labels button
-		const editLabelsButton = contentEl.createEl("button", { text: "Edit Labels" });
-		editLabelsButton.classList.add("issues-edit-labels-button");
 
 		const labelsDropdown = contentEl.createDiv();
 		labelsDropdown.classList.add("issues-labels-dropdown");
-		labelsDropdown.style.display = "none"; // Initially hidden
 
 		// Fetch all available labels (assuming you have an API method for this)
 		if (this.issue.repo != null) {
 			const allLabels = await api_get_labels(this.octokit, this.issue.repo);
 			allLabels.forEach(label => {
+				labelsDropdown.createEl("br");
 				const labelCheckbox = labelsDropdown.createEl("input", { type: "checkbox", value: label.name });
 				labelCheckbox.checked = details.labels.some(issueLabel => issueLabel.name === label.name);
 				const labelLabel = labelsDropdown.createEl("label", { text: label.name });
 				labelLabel.htmlFor = label.name;
-				labelsDropdown.createEl("br");
 			});
+			labelsDropdown.createEl("br");
 
-			editLabelsButton.onclick = () => {
-				labelsDropdown.style.display = labelsDropdown.style.display === "none" ? "block" : "none";
-			};
-
-			contentEl.appendChild(editLabelsButton);
 			contentEl.appendChild(labelsDropdown);
 
 			// Add Save Labels button
 			const saveLabelsButton = contentEl.createEl("button", { text: "Save Labels" });
 			saveLabelsButton.classList.add("issues-save-labels-button");
-			saveLabelsButton.style.display = "none"; // Initially hidden
 
 			saveLabelsButton.onclick = async () => {
 				const selectedLabels = Array.from(labelsDropdown.querySelectorAll("input:checked")).map((checkbox: HTMLInputElement) => checkbox.value);
@@ -125,14 +119,7 @@ export class IssuesDetailsModal extends Modal {
 					new Notice("Could not update labels");
 				}
 			};
-
 			contentEl.appendChild(saveLabelsButton);
-
-			// Show Save Labels button when dropdown is visible
-			editLabelsButton.onclick = () => {
-				labelsDropdown.style.display = labelsDropdown.style.display === "none" ? "block" : "none";
-				saveLabelsButton.style.display = labelsDropdown.style.display === "none" ? "none" : "block";
-			};
 		}
 
 		if (details.assignee.login != undefined) {

@@ -60,12 +60,12 @@ export default class MyPlugin extends Plugin {
 					: new Octokit({ auth: "" });
 				if (!this.octokit) {
 					new Notice(
-						"Authentication failed. Please check your credentials.",
+						"Authentication failed. Please check your Git credentials in the plugin credentials.",
 					);
 				}
 			} catch (e) {
 				new Notice(
-					"Authentication failed. Please check your credentials.",
+					"Authentication failed. Please check your Git in the plugin credentials.",
 				);
 			}
 		}
@@ -126,6 +126,16 @@ export default class MyPlugin extends Plugin {
 				} else {
 					issues = await api_get_own_issues(this.octokit, repo);
 				}
+
+  				issues = issues.sort((s1,s2) => {
+					if (s1.sort_string > s2.sort_string) {
+						return 1;
+					}
+					if (s1.sort_string < s2.sort_string) {
+						return -1;
+					}
+					return 0;
+				}) 
 
 				issues.forEach((issue) => {
 					switch (this.settings.issue_appearance) {

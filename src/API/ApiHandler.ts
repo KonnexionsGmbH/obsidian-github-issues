@@ -1,6 +1,7 @@
 import { Octokit } from "@octokit/core";
 import { Issue } from "../Issues/Issue";
 import { parseRepoUrl } from "../Utils/Utils";
+import { getIssueSortKey } from "../Utils/Utils";
 import { OctokitResponse } from "@octokit/types";
 import { Notice } from "obsidian";
 
@@ -64,12 +65,38 @@ export async function api_get_labels(octokit: Octokit, repo: RepoItem): Promise<
 	})
 
 	if (res.status == 200) {
-		return res.data.map((label) => {
+		const feature_labels: Label[] = [];
+		const platform_labels: Label[] = [];
+		const normal_labels: Label[] = [];
+		const mapped_labels = res.data.map((label: any) => {
 			return {
 				name: label.name,
 				color: label.color
-			};
+			} as Label ?? [];
 		})
+
+		mapped_labels.forEach((label) => {
+			if (label.name.search(/#F_/) == 0) {
+				feature_labels.push(label);
+			}
+			else if (label.name == '#App') {
+				platform_labels.push(label);
+			}
+			else if (label.name == '#Core') {
+				platform_labels.push(label);
+			}
+			else if (label.name == '#Server') {
+				platform_labels.push(label);
+			}
+			else if (label.name == '#User') {
+				platform_labels.push(label);
+			}
+			else {
+				normal_labels.push(label)
+			}
+		})
+		const sorted_labels: Label[] = feature_labels.concat(normal_labels).concat(platform_labels);
+		return sorted_labels;
 	} else {
 		return [];
 	}
@@ -92,7 +119,7 @@ export async function api_submit_issue(octokit: Octokit, repo: RepoItem | null, 
 		assignees: [
 			repo.owner
 		],
-		labels: issue.labels,
+		labels: issue.normal_labels,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
 		}
@@ -110,6 +137,7 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string): Prom
 
 	const { owner, repo } = parseRepoUrl(url);
 	const issues: Issue[] = [];
+	console.debug("api_get_issues_by_url");
 	try {
 		const res = await octokit.request('GET /repos/{owner}/{repo}/issues', {
 			owner: owner,
@@ -121,18 +149,48 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string): Prom
 
 		if (res.status == 200) {
 			for (const issue of res.data) {
+				const feature_labels: Label[] = [];
+				const platform_labels: Label[] = [];
+				const normal_labels: Label[] = [];
+				const mapped_labels = issue.labels.map((label: any) => {
+					return {
+						name: label.name,
+						color: label.color
+					} as Label ?? [];
+				})
+				mapped_labels.forEach((label) => {
+					if (label.name.search(/#F_/) == 0) {
+						feature_labels.push(label);
+					}
+					else if (label.name == '#App') {
+						platform_labels.push(label);
+					}
+					else if (label.name == '#Core') {
+						platform_labels.push(label);
+					}
+					else if (label.name == '#Server') {
+						platform_labels.push(label);
+					}
+					else if (label.name == '#User') {
+						platform_labels.push(label);
+					}
+					else {
+						normal_labels.push(label)
+					}
+				})
+
 				issues.push(new Issue(
 					issue.title,
 					issue.body ?? "",
 					issue.user?.login ?? "",
 					issue.number,
 					issue.created_at,
-					issue.labels.map((label: any) => {
-						return {
-							name: label.name,
-							color: label.color
-						} as Label ?? [];
-					})));
+					normal_labels,
+					feature_labels,
+					platform_labels,
+					getIssueSortKey(issue.title, feature_labels, platform_labels),
+					repo
+				));
 			}
 
 			return issues;
@@ -155,6 +213,7 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string): Prom
  */
 export async function api_get_own_issues(octokit: Octokit, repo: RepoItem): Promise<Issue[]> {
 	const issues: Issue[] = [];
+	console.debug("api_get_own_issues");
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues', {
 		owner: repo.owner,
 		repo: repo.name,
@@ -165,18 +224,46 @@ export async function api_get_own_issues(octokit: Octokit, repo: RepoItem): Prom
 
 	if (res.status == 200) {
 		for (const issue of res.data) {
+			const feature_labels: Label[] = [];
+			const platform_labels: Label[] = [];
+			const normal_labels: Label[] = [];
+				const mapped_labels = issue.labels.map((label: any) => {
+				return {
+					name: label.name,
+					color: label.color
+				} as Label ?? [];
+			})
+			mapped_labels.forEach((label) => {
+				if (label.name.search(/#F_/) == 0) {
+					feature_labels.push(label);
+				}
+				else if (label.name == '#App') {
+					platform_labels.push(label);
+				}
+				else if (label.name == '#Core') {
+					platform_labels.push(label);
+				}
+				else if (label.name == '#Server') {
+					platform_labels.push(label);
+				}
+				else if (label.name == '#User') {
+					platform_labels.push(label);
+				}
+				else {
+					normal_labels.push(label)
+				}
+			})
+
 			issues.push(new Issue(
 				issue.title,
 				issue.body ?? "",
 				issue.user?.login ?? "",
 				issue.number,
 				issue.created_at,
-				issue.labels.map((label: any) => {
-					return {
-						name: label.name,
-						color: label.color
-					} as Label ?? [];
-				}),
+				normal_labels,
+				feature_labels,
+				platform_labels,
+				getIssueSortKey(issue.title, feature_labels, platform_labels),
 				repo
 			));
 		}
