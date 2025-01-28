@@ -1,7 +1,6 @@
 import { Octokit } from "@octokit/core";
-import { Issue } from "../Issues/Issue";
+import { TaskLabels, Issue, getIssueSortKey } from "../Issues/Issue";
 import { parseRepoUrl } from "../Utils/Utils";
-import { getIssueSortKey } from "../Utils/Utils";
 import { OctokitResponse } from "@octokit/types";
 import { Notice } from "obsidian";
 
@@ -65,38 +64,14 @@ export async function api_get_labels(octokit: Octokit, repo: RepoItem): Promise<
 	})
 
 	if (res.status == 200) {
-		const feature_labels: Label[] = [];
-		const platform_labels: Label[] = [];
-		const normal_labels: Label[] = [];
 		const mapped_labels = res.data.map((label: any) => {
 			return {
 				name: label.name,
 				color: label.color
-			} as Label ?? [];
+			} as Label;
 		})
-
-		mapped_labels.forEach((label) => {
-			if (label.name.search(/#F_/) == 0) {
-				feature_labels.push(label);
-			}
-			else if (label.name == '#App') {
-				platform_labels.push(label);
-			}
-			else if (label.name == '#Core') {
-				platform_labels.push(label);
-			}
-			else if (label.name == '#Server') {
-				platform_labels.push(label);
-			}
-			else if (label.name == '#User') {
-				platform_labels.push(label);
-			}
-			else {
-				normal_labels.push(label)
-			}
-		})
-		const sorted_labels: Label[] = feature_labels.concat(normal_labels).concat(platform_labels);
-		return sorted_labels;
+		const tl = new TaskLabels(mapped_labels);
+		return tl.feature_labels.concat(tl.normal_labels).concat(tl.platform_labels);
 	} else {
 		return [];
 	}
@@ -149,46 +124,22 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string): Prom
 
 		if (res.status == 200) {
 			for (const issue of res.data) {
-				const feature_labels: Label[] = [];
-				const platform_labels: Label[] = [];
-				const normal_labels: Label[] = [];
 				const mapped_labels = issue.labels.map((label: any) => {
 					return {
 						name: label.name,
 						color: label.color
-					} as Label ?? [];
+					} as Label;
 				})
-				mapped_labels.forEach((label) => {
-					if (label.name.search(/#F_/) == 0) {
-						feature_labels.push(label);
-					}
-					else if (label.name == '#App') {
-						platform_labels.push(label);
-					}
-					else if (label.name == '#Core') {
-						platform_labels.push(label);
-					}
-					else if (label.name == '#Server') {
-						platform_labels.push(label);
-					}
-					else if (label.name == '#User') {
-						platform_labels.push(label);
-					}
-					else {
-						normal_labels.push(label)
-					}
-				})
-
+				const tl = new TaskLabels(mapped_labels);
+		
 				issues.push(new Issue(
 					issue.title,
 					issue.body ?? "",
 					issue.user?.login ?? "",
 					issue.number,
 					issue.created_at,
-					normal_labels,
-					feature_labels,
-					platform_labels,
-					getIssueSortKey(issue.title, feature_labels, platform_labels),
+					tl,
+					getIssueSortKey(issue.title, tl),
 					repo
 				));
 			}
@@ -224,46 +175,22 @@ export async function api_get_own_issues(octokit: Octokit, repo: RepoItem): Prom
 
 	if (res.status == 200) {
 		for (const issue of res.data) {
-			const feature_labels: Label[] = [];
-			const platform_labels: Label[] = [];
-			const normal_labels: Label[] = [];
-				const mapped_labels = issue.labels.map((label: any) => {
-				return {
-					name: label.name,
-					color: label.color
-				} as Label ?? [];
+			const mapped_labels = issue.labels.map((label: any) => {
+			return {
+				name: label.name,
+				color: label.color
+				} as Label;
 			})
-			mapped_labels.forEach((label) => {
-				if (label.name.search(/#F_/) == 0) {
-					feature_labels.push(label);
-				}
-				else if (label.name == '#App') {
-					platform_labels.push(label);
-				}
-				else if (label.name == '#Core') {
-					platform_labels.push(label);
-				}
-				else if (label.name == '#Server') {
-					platform_labels.push(label);
-				}
-				else if (label.name == '#User') {
-					platform_labels.push(label);
-				}
-				else {
-					normal_labels.push(label)
-				}
-			})
-
+			const tl = new TaskLabels(mapped_labels);
+		
 			issues.push(new Issue(
 				issue.title,
 				issue.body ?? "",
 				issue.user?.login ?? "",
 				issue.number,
 				issue.created_at,
-				normal_labels,
-				feature_labels,
-				platform_labels,
-				getIssueSortKey(issue.title, feature_labels, platform_labels),
+				tl,
+				getIssueSortKey(issue.title, tl),
 				repo
 			));
 		}

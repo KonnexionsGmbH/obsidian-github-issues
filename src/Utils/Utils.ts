@@ -1,4 +1,5 @@
 import { App } from "obsidian";
+import { TaskLabels } from "../Issues/Issue";
 
 /** 
  * Re-renders the current view
@@ -70,21 +71,3 @@ export function getPasteableTimeDelta(dateString: string) {
 	}
 }
 
-/*
- * Constructs a string which can be used to sort issues by features then issue title then platforms
- */
-export function getIssueSortKey(title: string, f_labels: Label[], p_labels: Label[]) {
-	const res: string[] = [];
-
-	f_labels.forEach((label) => {
-			res.push(label.name);
-	});
-
-	res.push(title);
-
-	p_labels.forEach((label) => {
-		res.push(label.name);
-	});
-
-	return res;
-}

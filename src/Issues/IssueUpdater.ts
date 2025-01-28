@@ -171,39 +171,69 @@ async function fetchIssues(octokit: Octokit, url: string) {
  */
 export function getRepoInFile(app: App) {
 	//get the current editor
+	let start_line = 0;
+	let end_line = 0;
+	let org_name = "";
+	let repo_name = "";
+	let file_name = "";
+	let task_token = "";
+	let hidden_token = "";
+	let platforms: string[] = [];
 	const view = app.workspace.getActiveViewOfType(MarkdownView)
 	if (view) {
 		const editor = view.editor;
 
 		//loop trough the document and print every line
-		let start_line = 0;
-		let end_line = 0;
 		for (let i = 0; i < editor.lineCount(); i++) {
 			const line = editor.getLine(i);
-			console.log(line);
+			// console.log(line);
 			if (line.includes("```github-issues")) {
 				start_line = i;
+				console.log("start_line:", start_line);
 			}
-			if (line.includes("```")) {
+			else if (line.includes("```")) {
 				end_line = i;
+				console.log("end_line:", end_line);
+			}
+			else if ((start_line>0) || (i == start_line + 1)) {
+				//parse the name and the repo from the first line
+				// const start_line_text = editor.getLine(start_line + 1);
+				const name_and_repo_split = line.split("/");
+				const org_name = name_and_repo_split[0];
+				const repo = name_and_repo_split[1];
+				console.log("name:", org_name);
+				console.log("repo:", repo);
+			}
+			else if ((start_line>0) || (i == start_line + 2)) {
+				// this is the file name of the note containing local tasks
+				file_name = line.trim();
+				console.log("file_name:", file_name);
+			}
+			else if ((start_line>0) || (i == start_line + 3)) {
+				// this is the task tag (maybe "#task") used to identify task lines
+				task_token = line.trim();
+				console.log("task_token:", task_token);
+			}
+			else if ((start_line>0) || (i == start_line + 4)) {
+				// this is the hidden tag (maybe "#hidden") used to prevent feature sync to Git 
+				hidden_token = line.trim();
+				console.log("hidden_token:", hidden_token);
+			}
+			else if ((start_line>0) || (end_line == 0)) {
+				platforms.push(line.trim());
 			}
 		}
-		//print the start and end line
-		console.log(start_line);
-		console.log(end_line);
+		console.log("platforms:", platforms);
 
-		//parse the name and the repo from the start line
-		const start_line_text = editor.getLine(start_line + 1);
-		const name_and_repo_split = start_line_text.split("/");
-		const name = name_and_repo_split[0];
-		const repo = name_and_repo_split[1];
-		console.log(name);
-		console.log(repo);
 
-		if (repo != undefined) {
+		if (repo_name != "") {
 			return {
-				name: name,
-				repo: repo,
+				name: org_name,
+				repo: repo_name,
+				file: file_name,
+				task: task_token,
+				hidden: hidden_token,
+				platforms: platforms,
 				start_line: start_line,
 				end_line: end_line
 			} as FileRepo
@@ -217,6 +247,10 @@ export function getRepoInFile(app: App) {
 interface FileRepo {
 	name: string,
 	repo: string,
+	file: string,
+	task: string,
+	hidden: string,
+	platforms: string[],
 	start_line: number,
 	end_line: number
 }

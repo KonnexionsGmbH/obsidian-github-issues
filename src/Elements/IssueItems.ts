@@ -31,7 +31,8 @@ export function createDefaultIssueElement(
 	});
 	detailsText.classList.add("issue-details-text");
 	const labelContainer = title.createDiv({ cls: "label-container" });
-	issue.feature_labels.forEach((label) => {
+	const all_labels: Label[] = issue.task_labels.feature_labels.concat(issue.task_labels.normal_labels).concat(issue.task_labels.platform_labels);
+	all_labels.forEach((label) => {
 		const labelEl = labelContainer.createDiv({ cls: "label" });
 		labelEl.style.backgroundColor = `#${label.color}`;
 		labelEl.style.color = getTextColor(label.color);
@@ -39,23 +40,6 @@ export function createDefaultIssueElement(
 		labelEl.classList.add("labelEl");
 	});
 	
-	issue.normal_labels.forEach((label) => {
-		const labelEl = labelContainer.createDiv({ cls: "label" });
-		labelEl.style.backgroundColor = `#${label.color}`;
-		labelEl.style.color = getTextColor(label.color);
-		labelEl.innerText = label.name;
-		labelEl.classList.add("labelEl");
-	});
-	
-	issue.platform_labels.forEach((label) => {
-		const labelEl = labelContainer.createDiv({ cls: "label" });
-		labelEl.style.backgroundColor = `#${label.color}`;
-		labelEl.style.color = getTextColor(label.color);
-		labelEl.innerText = label.name;
-		labelEl.classList.add("labelEl");
-	});
-	
-
 	container.addEventListener("mouseenter", () => {
 		container.style.opacity = "0.7";
 	});

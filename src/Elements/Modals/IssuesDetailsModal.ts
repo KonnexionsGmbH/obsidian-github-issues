@@ -1,5 +1,5 @@
 import { App, Component, MarkdownRenderer, Modal, Notice } from "obsidian";
-import { Issue } from "../../Issues/Issue";
+import { TaskLabels, Issue } from "../../Issues/Issue";
 import { Octokit } from "@octokit/core";
 import { getPasteableTimeDelta, reRenderView } from "../../Utils/Utils";
 import { loadingSpinner } from "../../Utils/Loader";
@@ -32,16 +32,35 @@ export class IssuesDetailsModal extends Modal {
 		const titleInput = contentEl.createEl("textarea", { text: this.issue.title });
 		titleInput.classList.add("issues-title-input");
 
-		const repoAndStuff = contentEl.createSpan({
-			text:  this.issue.repo?.name + ` issue #` + this.issue.number
-		});
-		repoAndStuff.classList.add("issues-repo")
+		contentEl.createEl("br");
+
+		const saveTitleButton = contentEl.createEl("button", { text: "Save Title" });
+		saveTitleButton.classList.add("issues-save-labels-button");
 
 		contentEl.createEl("br");
-		const authorAndSutff = contentEl.createSpan({
+
+		const repoAndId = contentEl.createSpan({
+			text:  this.issue.repo?.name + ` issue #` + this.issue.number
+		});
+		repoAndId.classList.add("issues-repo")
+
+		saveTitleButton.onclick = async () => {
+			const updated = await api_update_issue(this.octokit, this.issue, {
+				title: titleInput.value
+			});
+			if (updated) {
+				// reRenderView(this.app);
+				new Notice("Issue Title updated");
+			} else {
+				new Notice("Could not update issue");
+			}
+		}
+
+		contentEl.createEl("br");
+		const authorAndCreateDate = contentEl.createSpan({
 			text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
 		});
-		authorAndSutff.classList.add("issues-author")
+		authorAndCreateDate.classList.add("issues-author")
 
 		contentEl.createEl("br");
 		const issueLink = contentEl.createEl("a", { text: "View on GitHub" });
@@ -70,15 +89,24 @@ export class IssuesDetailsModal extends Modal {
 			statePill.style.backgroundColor = "rgba(116, 58, 222, 0.5)";
 		}
 
-
 		const state = statePill.createEl("span", { text: details?.state });
 		state.classList.add("issues-state")
 
 		const labels = stateAndLabelsContainer.createDiv();
 		labels.classList.add("issues-labels")
+
+		const mapped_labels = details.labels.map((label: any) => {
+			return {
+				name: label.name,
+				color: label.color
+			} as Label;
+		})
+		const tl = new TaskLabels(mapped_labels);
+		const sorted_labels: Label[] = tl.feature_labels.concat(tl.normal_labels).concat(tl.platform_labels);
+		
 		//loop through the labels
 		// eslint-disable-next-line no-unsafe-optional-chaining
-		for (const label of details?.labels) {
+		for (const label of sorted_labels) {
 			const labelPill = labels.createDiv();
 			labelPill.classList.add("issues-label-pill")
 			labelPill.style.background = "#" + label.color;
@@ -90,7 +118,7 @@ export class IssuesDetailsModal extends Modal {
 		const labelsDropdown = contentEl.createDiv();
 		labelsDropdown.classList.add("issues-labels-dropdown");
 
-		// Fetch all available labels (assuming you have an API method for this)
+		// Fetch all available labels
 		if (this.issue.repo != null) {
 			const allLabels = await api_get_labels(this.octokit, this.issue.repo);
 			allLabels.forEach(label => {
@@ -138,18 +166,26 @@ export class IssuesDetailsModal extends Modal {
 			assignee.classList.add("issues-assignee")
 		}
 
-		const bodyContainer = contentEl.createDiv();
-		bodyContainer.classList.add("issues-body-container")
+		// MarkdownRenderer.renderMarkdown(details?.body, body, "", Component.prototype);
+		const descriptionInput = contentEl.createEl("textarea", { text: this.issue.description });
+		descriptionInput.classList.add("issues-description-input");
 
-		const containerTitle = bodyContainer.createEl("h3", { text: "Description" });
-		containerTitle.classList.add("issues-container-title")
+		const saveDescriptionButton = contentEl.createEl("button", { text: "Save Description" });
+		saveDescriptionButton.classList.add("issues-save-labels-button");
 
-		const body = bodyContainer.createDiv();
-		body.classList.add("issues-body")
+		saveDescriptionButton.onclick = async () => {
+			const updated = await api_update_issue(this.octokit, this.issue, {
+				body: descriptionInput.value
+			});
+			if (updated) {
+				// reRenderView(this.app);
+				new Notice("Issue Description updated");
+			} else {
+				new Notice("Could not update issue");
+			}
+		}
 
-		MarkdownRenderer.renderMarkdown(details?.body, body, "", Component.prototype);
-
-		//load the comments
+		//load the comments 
 		const spinner2 = loadingSpinner();
 		contentEl.appendChild(spinner2);
 		const comments = await api_get_issue_comments(this.octokit, this.issue);
