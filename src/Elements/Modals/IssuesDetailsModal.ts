@@ -210,11 +210,40 @@ export class IssuesDetailsModal extends Modal {
 			assignee.classList.add("issues-assignee")
 		}
 
-		const descriptionInput = contentEl.createEl("textarea", { text: details.body });
-		// MarkdownRenderer.renderMarkdown(details?.body, descriptionInput, "", Component.prototype);
+		const descriptionContainer = contentEl.createDiv();
+		descriptionContainer.classList.add("description-container");
+
+		const descriptionInput = descriptionContainer.createEl("textarea", { text: details.body });
 		descriptionInput.classList.add("issues-description-input");
-		descriptionInput.value = details.body;
 		descriptionInput.rows = Math.min(details.body.split('\n').length, 10);
+
+		const previewContainer = descriptionContainer.createDiv();
+		previewContainer.classList.add("description-preview");
+		previewContainer.style.display = "none";
+
+		const toggleButton = descriptionContainer.createEl("button", { text: "Preview" });
+		toggleButton.classList.add("toggle-preview-button");
+
+		toggleButton.addEventListener("click", async () => {
+			if (previewContainer.style.display === "none") {
+				// Switch to preview
+				previewContainer.empty();
+				await MarkdownRenderer.renderMarkdown(
+					descriptionInput.value, 
+					previewContainer, 
+					"", 
+					Component.prototype
+				);
+				descriptionInput.style.display = "none";
+				previewContainer.style.display = "block";
+				toggleButton.setText("Edit");
+			} else {
+				// Switch to edit
+				descriptionInput.style.display = "block";
+				previewContainer.style.display = "none";
+				toggleButton.setText("Preview");
+			}
+		});
 
 		const saveDescriptionButton = contentEl.createEl("button", { text: "Save Description" });
 		saveDescriptionButton.classList.add("save-button");

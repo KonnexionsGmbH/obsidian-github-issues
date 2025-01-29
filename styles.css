@@ -237,6 +237,26 @@
     overflow-y: auto;
 }
 
+.description-container {
+    position: relative;
+    margin-top: 30px;
+}
+
+.description-preview {
+    min-height: 100px;
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    background: var(--background-primary);
+}
+
+.toggle-preview-button {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    font-size: 0.9em;
+}
+
 .issues-comments-container {
 	margin-top: 10px;
 	display: flex;
