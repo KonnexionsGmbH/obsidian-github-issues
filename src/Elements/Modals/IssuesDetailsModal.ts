@@ -9,7 +9,8 @@ import {
 	api_get_issue_details,
 	api_update_issue,
 	api_get_labels,
-	api_set_labels_on_issue
+	api_set_labels_on_issue,
+	Label
 } from "../../API/ApiHandler";
 import { updateIssues } from "../../Issues/IssueUpdater";
 import { getTextColor } from "../../Utils/Color.utils";
@@ -35,12 +36,12 @@ export class IssuesDetailsModal extends Modal {
 		contentEl.createEl("br");
 
 		const saveTitleButton = contentEl.createEl("button", { text: "Save Title" });
-		saveTitleButton.classList.add("issues-save-labels-button");
+		saveTitleButton.classList.add("save-button");
 
-		contentEl.createEl("br");
+		this.showButtonOnInputChange(titleInput, saveTitleButton, this.issue.title);
 
 		const repoAndId = contentEl.createSpan({
-			text:  this.issue.repo?.name + ` issue #` + this.issue.number
+			text: this.issue.repo?.name + ` issue #` + this.issue.number
 		});
 		repoAndId.classList.add("issues-repo")
 
@@ -103,7 +104,7 @@ export class IssuesDetailsModal extends Modal {
 		})
 		const tl = new TaskLabels(mapped_labels);
 		const sorted_labels: Label[] = tl.feature_labels.concat(tl.normal_labels).concat(tl.platform_labels);
-		
+
 		//loop through the labels
 		// eslint-disable-next-line no-unsafe-optional-chaining
 		for (const label of sorted_labels) {
@@ -115,29 +116,72 @@ export class IssuesDetailsModal extends Modal {
 			labelName.style.color = getTextColor(label.color);
 		}
 
-		const labelsDropdown = contentEl.createDiv();
-		labelsDropdown.classList.add("issues-labels-dropdown");
+		const labelsGrid = contentEl.createDiv();
+		labelsGrid.classList.add("labels-grid");
 
-		// Fetch all available labels
 		if (this.issue.repo != null) {
 			const allLabels = await api_get_labels(this.octokit, this.issue.repo);
-			allLabels.forEach(label => {
-				labelsDropdown.createEl("br");
-				const labelCheckbox = labelsDropdown.createEl("input", { type: "checkbox", value: label.name });
-				labelCheckbox.checked = details.labels.some(issueLabel => issueLabel.name === label.name);
-				const labelLabel = labelsDropdown.createEl("label", { text: label.name });
-				labelLabel.htmlFor = label.name;
-			});
-			labelsDropdown.createEl("br");
-
-			contentEl.appendChild(labelsDropdown);
-
-			// Add Save Labels button
+			const originalSelections = new Set(details.labels.map(label => label.name));
+			const checkboxes: HTMLInputElement[] = [];
+		
+			for (let i = 0; i < allLabels.length; i += 2) {
+				const row = labelsGrid.createDiv();
+				row.classList.add("labels-row");
+		
+				// First label
+				const labelContainer1 = row.createDiv();
+				labelContainer1.classList.add("label-grid-container");
+				const labelCheckbox1 = labelContainer1.createEl("input", {
+					type: "checkbox",
+					value: allLabels[i].name
+				});
+				labelCheckbox1.checked = originalSelections.has(allLabels[i].name);
+				checkboxes.push(labelCheckbox1);
+				const labelLabel1 = labelContainer1.createEl("label", { text: allLabels[i].name });
+				labelLabel1.htmlFor = allLabels[i].name;
+		
+				// Second label (if exists)
+				if (i + 1 < allLabels.length) {
+					const labelContainer2 = row.createDiv();
+					labelContainer2.classList.add("label-grid-container");
+					const labelCheckbox2 = labelContainer2.createEl("input", {
+						type: "checkbox",
+						value: allLabels[i + 1].name
+					});
+					labelCheckbox2.checked = originalSelections.has(allLabels[i + 1].name);
+					checkboxes.push(labelCheckbox2);
+					const labelLabel2 = labelContainer2.createEl("label", { text: allLabels[i + 1].name });
+					labelLabel2.htmlFor = allLabels[i + 1].name;
+				}
+			}
+		
 			const saveLabelsButton = contentEl.createEl("button", { text: "Save Labels" });
-			saveLabelsButton.classList.add("issues-save-labels-button");
+			saveLabelsButton.classList.add("save-button");
+		
+			const checkForChanges = () => {
+				const currentSelections = new Set(
+					checkboxes
+						.filter(cb => cb.checked)
+						.map(cb => cb.value)
+				);
+				
+				const hasChanges = 
+					originalSelections.size !== currentSelections.size || 
+					![...originalSelections].every(label => currentSelections.has(label));
+		
+				if (hasChanges) {
+					saveLabelsButton.classList.add("visible");
+				} else {
+					saveLabelsButton.classList.remove("visible");
+				}
+			};
+		
+			checkboxes.forEach(checkbox => {
+				checkbox.addEventListener("change", checkForChanges);
+			});
 
 			saveLabelsButton.onclick = async () => {
-				const selectedLabels = Array.from(labelsDropdown.querySelectorAll("input:checked")).map((checkbox: HTMLInputElement) => checkbox.value);
+				const selectedLabels = Array.from(labelsGrid.querySelectorAll("input:checked")).map((checkbox: HTMLInputElement) => checkbox.value);
 				console.log(selectedLabels);
 				const updated = await api_set_labels_on_issue(this.octokit, this.issue, selectedLabels);
 				if (updated) {
@@ -147,8 +191,8 @@ export class IssuesDetailsModal extends Modal {
 					new Notice("Could not update labels");
 				}
 			};
-			contentEl.appendChild(saveLabelsButton);
 		}
+		
 
 		if (details.assignee.login != undefined) {
 			const assigneeContainer = contentEl.createDiv();
@@ -167,11 +211,13 @@ export class IssuesDetailsModal extends Modal {
 		}
 
 		// MarkdownRenderer.renderMarkdown(details?.body, body, "", Component.prototype);
-		const descriptionInput = contentEl.createEl("textarea", { text: this.issue.description });
+		const descriptionInput = contentEl.createEl("textarea", { text: details.body });
 		descriptionInput.classList.add("issues-description-input");
 
 		const saveDescriptionButton = contentEl.createEl("button", { text: "Save Description" });
-		saveDescriptionButton.classList.add("issues-save-labels-button");
+		saveDescriptionButton.classList.add("save-button");
+
+		this.showButtonOnInputChange(descriptionInput, saveDescriptionButton, details.body);
 
 		saveDescriptionButton.onclick = async () => {
 			const updated = await api_update_issue(this.octokit, this.issue, {
@@ -186,6 +232,9 @@ export class IssuesDetailsModal extends Modal {
 		}
 
 		//load the comments 
+		// MarkdownRenderer.render(this.app, details?.body, body, "", Component.prototype);
+
+		//load the comments
 		const spinner2 = loadingSpinner();
 		contentEl.appendChild(spinner2);
 		const comments = await api_get_issue_comments(this.octokit, this.issue);
@@ -219,6 +268,7 @@ export class IssuesDetailsModal extends Modal {
 			const commentText = commentBody.createEl("span");
 			MarkdownRenderer.renderMarkdown(comment?.body, commentText, "", Component.prototype);
 			commentText.classList.add("issues-comment-text")
+			commentText.classList.add("selectable-text");
 
 		});
 
@@ -261,5 +311,15 @@ export class IssuesDetailsModal extends Modal {
 			}
 		}
 
+	}
+
+	private showButtonOnInputChange(input: HTMLTextAreaElement, button: HTMLButtonElement, initialValue: string) {
+		input.addEventListener("input", () => {
+			if (input.value !== initialValue) {
+				button.classList.add("visible");
+			} else {
+				button.classList.remove("visible");
+			}
+		});
 	}
 }
