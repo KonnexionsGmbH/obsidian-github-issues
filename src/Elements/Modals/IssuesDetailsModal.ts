@@ -123,11 +123,11 @@ export class IssuesDetailsModal extends Modal {
 			const allLabels = await api_get_labels(this.octokit, this.issue.repo);
 			const originalSelections = new Set(details.labels.map(label => label.name));
 			const checkboxes: HTMLInputElement[] = [];
-		
+
 			for (let i = 0; i < allLabels.length; i += 2) {
 				const row = labelsGrid.createDiv();
 				row.classList.add("labels-row");
-		
+
 				// First label
 				const labelContainer1 = row.createDiv();
 				labelContainer1.classList.add("label-grid-container");
@@ -139,7 +139,7 @@ export class IssuesDetailsModal extends Modal {
 				checkboxes.push(labelCheckbox1);
 				const labelLabel1 = labelContainer1.createEl("label", { text: allLabels[i].name });
 				labelLabel1.htmlFor = allLabels[i].name;
-		
+
 				// Second label (if exists)
 				if (i + 1 < allLabels.length) {
 					const labelContainer2 = row.createDiv();
@@ -154,28 +154,28 @@ export class IssuesDetailsModal extends Modal {
 					labelLabel2.htmlFor = allLabels[i + 1].name;
 				}
 			}
-		
+
 			const saveLabelsButton = contentEl.createEl("button", { text: "Save Labels" });
 			saveLabelsButton.classList.add("save-button");
-		
+
 			const checkForChanges = () => {
 				const currentSelections = new Set(
 					checkboxes
 						.filter(cb => cb.checked)
 						.map(cb => cb.value)
 				);
-				
-				const hasChanges = 
-					originalSelections.size !== currentSelections.size || 
+
+				const hasChanges =
+					originalSelections.size !== currentSelections.size ||
 					![...originalSelections].every(label => currentSelections.has(label));
-		
+
 				if (hasChanges) {
 					saveLabelsButton.classList.add("visible");
 				} else {
 					saveLabelsButton.classList.remove("visible");
 				}
 			};
-		
+
 			checkboxes.forEach(checkbox => {
 				checkbox.addEventListener("change", checkForChanges);
 			});
@@ -192,7 +192,7 @@ export class IssuesDetailsModal extends Modal {
 				}
 			};
 		}
-		
+
 
 		if (details.assignee.login != undefined) {
 			const assigneeContainer = contentEl.createDiv();
@@ -210,9 +210,11 @@ export class IssuesDetailsModal extends Modal {
 			assignee.classList.add("issues-assignee")
 		}
 
-		// MarkdownRenderer.renderMarkdown(details?.body, body, "", Component.prototype);
 		const descriptionInput = contentEl.createEl("textarea", { text: details.body });
+		// MarkdownRenderer.renderMarkdown(details?.body, descriptionInput, "", Component.prototype);
 		descriptionInput.classList.add("issues-description-input");
+		descriptionInput.value = details.body;
+		descriptionInput.rows = Math.min(details.body.split('\n').length, 10);
 
 		const saveDescriptionButton = contentEl.createEl("button", { text: "Save Description" });
 		saveDescriptionButton.classList.add("save-button");
