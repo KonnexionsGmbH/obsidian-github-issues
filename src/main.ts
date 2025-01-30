@@ -14,6 +14,7 @@ import {
 	createDefaultIssueElement,
 } from "./Elements/IssueItems";
 import { Issue } from "./Issues/Issue";
+import { Feature, Task } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
 import { parseIssuesToEmbed } from "./Issues/Issues.shared";
 import { reRenderView } from "./Utils/Utils";
@@ -136,7 +137,9 @@ export default class MyPlugin extends Plugin {
 					}
 					return 0;
 				})
-
+				let features: Feature[] = [];
+				let last_feature = "";
+				let acc_tasks: Task[] = [];
 				this.app.workspace.iterateRootLeaves((leaf) => {
 					if ((leaf.getDisplayText() == "IO-XPA Releases") && (leaf.getViewState().type == "markdown")) {
 						console.log("Workspace Leaf: ", leaf.getDisplayText(), " ", leaf.getViewState().type);
@@ -145,8 +148,17 @@ export default class MyPlugin extends Plugin {
 							const editor = leaf.view.editor;
 							console.log("EditorLineCount: ", editor.lineCount());
 							for (let i = 0; i < editor.lineCount(); i++) {
-								if (editor.getLine(i).startsWith("### #F_")) {
+								let line = editor.getLine(i);
+								let words = line.split(" ");
+								if (last_feature == "") { // look for a new feature
+									if ((line.indexOf("#hidden") == -1) && (line.startsWith("### #"))) {
+										last_feature = words[1];
+										features.push(new Feature(i,0,last_feature,false,[]));
+									}
+								} else { // look for the end of the last feature
+									if (line.startsWith("### #")) {
 
+									}
 								}
 							}
 						}
