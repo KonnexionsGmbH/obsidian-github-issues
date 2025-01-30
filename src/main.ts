@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, Plugin, PluginSettingTab, Setting, View, Editor, WorkspaceLeaf } from "obsidian";
 import {
 	api_authenticate,
 	api_get_issues_by_id,
@@ -135,7 +135,23 @@ export default class MyPlugin extends Plugin {
 						return -1;
 					}
 					return 0;
-				}) 
+				})
+
+				this.app.workspace.iterateRootLeaves((leaf) => {
+					if ((leaf.getDisplayText() == "IO-XPA Releases") && (leaf.getViewState().type == "markdown")) {
+						console.log("Workspace Leaf: ", leaf.getDisplayText(), " ", leaf.getViewState().type);
+						this.app.workspace.setActiveLeaf(leaf, {focus: false});
+						if (leaf.view) {
+							const editor = leaf.view.editor;
+							console.log("EditorLineCount: ", editor.lineCount());
+							for (let i = 0; i < editor.lineCount(); i++) {
+								if (editor.getLine(i).startsWith("### #F_")) {
+
+								}
+							}
+						}
+					}
+				})
 
 				issues.forEach((issue) => {
 					switch (this.settings.issue_appearance) {
@@ -144,7 +160,7 @@ export default class MyPlugin extends Plugin {
 								el,
 								issue,
 								this.octokit,
-								app,
+								this.app,
 							);
 							break;
 						case IssueAppearance.COMPACT:
@@ -152,7 +168,7 @@ export default class MyPlugin extends Plugin {
 								el,
 								issue,
 								this.octokit,
-								app,
+								this.app,
 							);
 							break;
 					}

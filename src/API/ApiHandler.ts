@@ -53,7 +53,7 @@ export async function api_get_repos(octokit: Octokit) {
  * @param octokit
  * @param repo
  */
-export async function api_get_labels(octokit: Octokit, repo: RepoItem): Promise<any[]> {
+export async function api_get_labels(octokit: Octokit, repo: RepoItem): Promise<TaskLabels> {
 
 	const res = await octokit.request('GET /repos/{owner}/{repo}/labels', {
 		owner: repo.owner,
@@ -70,8 +70,9 @@ export async function api_get_labels(octokit: Octokit, repo: RepoItem): Promise<
 				color: label.color
 			} as Label;
 		})
-		const tl = new TaskLabels(mapped_labels);
-		return tl.feature_labels.concat(tl.normal_labels).concat(tl.platform_labels);
+		// const tl = new TaskLabels(mapped_labels);
+		// return tl.feature_labels.concat(tl.normal_labels).concat(tl.platform_labels);
+		return new TaskLabels(mapped_labels);
 	} else {
 		return [];
 	}
@@ -94,7 +95,7 @@ export async function api_submit_issue(octokit: Octokit, repo: RepoItem | null, 
 		assignees: [
 			repo.owner
 		],
-		labels: issue.normal_labels,
+		labels: issue.labels,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
 		}
@@ -230,11 +231,13 @@ export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
 				}
 			}),
 			state: res.data.state,
+			avatar_url: res.data.user?.avatar_url,
 			updated_at: res.data.updated_at,
 			assignee: {
 				avatar_url: res.data.assignee?.avatar_url,
 				login: res.data.assignee?.login
 			} as Assignee,
+			
 			comments: res.data.comments
 		} as RepoDetails;
 	} else {
@@ -346,6 +349,7 @@ export interface RepoItem {
 
 export interface RepoDetails {
 	title: string;
+	avatar_url: string,
 	body: string;
 	labels: Label[];
 	state: string;

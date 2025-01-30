@@ -33,17 +33,10 @@ export class IssuesDetailsModal extends Modal {
 		const titleInput = contentEl.createEl("textarea", { text: this.issue.title });
 		titleInput.classList.add("issues-title-input");
 
-		contentEl.createEl("br");
-
 		const saveTitleButton = contentEl.createEl("button", { text: "Save Title" });
 		saveTitleButton.classList.add("save-button");
 
 		this.showButtonOnInputChange(titleInput, saveTitleButton, this.issue.title);
-
-		const repoAndId = contentEl.createSpan({
-			text: this.issue.repo?.name + ` issue #` + this.issue.number
-		});
-		repoAndId.classList.add("issues-repo")
 
 		saveTitleButton.onclick = async () => {
 			const updated = await api_update_issue(this.octokit, this.issue, {
@@ -57,25 +50,43 @@ export class IssuesDetailsModal extends Modal {
 			}
 		}
 
-		contentEl.createEl("br");
-		const authorAndCreateDate = contentEl.createSpan({
-			text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
-		});
-		authorAndCreateDate.classList.add("issues-author")
-
-		contentEl.createEl("br");
-		const issueLink = contentEl.createEl("a", { text: "View on GitHub" });
-		issueLink.setAttribute("href", "https://github.com/" + this.issue.repo?.owner + "/" + this.issue.repo?.name + "/issues/" + this.issue.number);
-		issueLink.classList.add("issue-link")
+		//fetch the issue details
 		const spinner = loadingSpinner();
 		contentEl.appendChild(spinner);
-
-		//fetch the issue details
 		const details = await api_get_issue_details(this.octokit, this.issue);
 		spinner.remove();
 		if (!details) {
 			contentEl.createEl("h3", { text: "Could not fetch issue details" });
 			return;
+		}
+
+		const createdContainer = contentEl.createDiv();
+		createdContainer.classList.add("created-container");
+
+		const authorAndCreateDate = createdContainer.createSpan();
+		//author icon
+		const authorIcon = authorAndCreateDate.createEl("img");
+		authorIcon.classList.add("issues-assignee-icon")
+		authorIcon.src = details?.avatar_url;
+		//author login
+		const author = authorAndCreateDate.createSpan({
+			text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
+		});
+
+		const issueLink = createdContainer.createEl("a", { text: this.issue.repo?.name + ` #` + this.issue.number });
+		issueLink.setAttribute("href", "https://github.com/" + this.issue.repo?.owner + "/" + this.issue.repo?.name + "/issues/" + this.issue.number);
+		issueLink.classList.add("issue-link")
+
+		if (details.assignee.login != undefined) {
+			const createdContainer = contentEl.createDiv();
+			//assignee icon
+			const assigneeIcon = createdContainer.createEl("img");
+			assigneeIcon.classList.add("issues-assignee-icon")
+			assigneeIcon.src = details?.assignee.avatar_url;
+			//asignee login
+			const assignee = createdContainer.createSpan({
+				text: `Assigned to ${details?.assignee.login}`
+			});
 		}
 
 		const stateAndLabelsContainer = contentEl.createDiv();
@@ -124,36 +135,9 @@ export class IssuesDetailsModal extends Modal {
 			const originalSelections = new Set(details.labels.map(label => label.name));
 			const checkboxes: HTMLInputElement[] = [];
 
-			for (let i = 0; i < allLabels.length; i += 2) {
-				const row = labelsGrid.createDiv();
-				row.classList.add("labels-row");
-
-				// First label
-				const labelContainer1 = row.createDiv();
-				labelContainer1.classList.add("label-grid-container");
-				const labelCheckbox1 = labelContainer1.createEl("input", {
-					type: "checkbox",
-					value: allLabels[i].name
-				});
-				labelCheckbox1.checked = originalSelections.has(allLabels[i].name);
-				checkboxes.push(labelCheckbox1);
-				const labelLabel1 = labelContainer1.createEl("label", { text: allLabels[i].name });
-				labelLabel1.htmlFor = allLabels[i].name;
-
-				// Second label (if exists)
-				if (i + 1 < allLabels.length) {
-					const labelContainer2 = row.createDiv();
-					labelContainer2.classList.add("label-grid-container");
-					const labelCheckbox2 = labelContainer2.createEl("input", {
-						type: "checkbox",
-						value: allLabels[i + 1].name
-					});
-					labelCheckbox2.checked = originalSelections.has(allLabels[i + 1].name);
-					checkboxes.push(labelCheckbox2);
-					const labelLabel2 = labelContainer2.createEl("label", { text: allLabels[i + 1].name });
-					labelLabel2.htmlFor = allLabels[i + 1].name;
-				}
-			}
+			appendLabelCheckboxes (labelsGrid, originalSelections, allLabels.feature_labels, checkboxes);
+			appendLabelCheckboxes (labelsGrid, originalSelections, allLabels.normal_labels, checkboxes);
+			appendLabelCheckboxes (labelsGrid, originalSelections, allLabels.platform_labels, checkboxes);
 
 			const saveLabelsButton = contentEl.createEl("button", { text: "Save Labels" });
 			saveLabelsButton.classList.add("save-button");
@@ -193,31 +177,16 @@ export class IssuesDetailsModal extends Modal {
 			};
 		}
 
-
-		if (details.assignee.login != undefined) {
-			const assigneeContainer = contentEl.createDiv();
-			assigneeContainer.classList.add("issues-asignee-container")
-
-			//assignee icon
-			const assigneeIcon = assigneeContainer.createEl("img");
-			assigneeIcon.classList.add("issues-assignee-icon")
-			assigneeIcon.src = details?.assignee.avatar_url;
-
-			//asignee login
-			const assignee = assigneeContainer.createSpan({
-				text: `Assigned to ${details?.assignee.login}`
-			});
-			assignee.classList.add("issues-assignee")
-		}
-
 		const descriptionContainer = contentEl.createDiv();
 		descriptionContainer.classList.add("description-container");
 
 		const descriptionInput = descriptionContainer.createEl("textarea", { text: details.body });
 		descriptionInput.classList.add("issues-description-input");
-		descriptionInput.rows = Math.min(details.body.split('\n').length, 10);
+		if (details.body) {
+			descriptionInput.rows = Math.min(details.body.split('\n').length, 10);
+		}
 
-		const previewContainer = descriptionContainer.createDiv();
+/*		const previewContainer = descriptionContainer.createDiv();
 		previewContainer.classList.add("description-preview");
 		previewContainer.style.display = "none";
 
@@ -244,7 +213,7 @@ export class IssuesDetailsModal extends Modal {
 				toggleButton.setText("Preview");
 			}
 		});
-
+*/
 		const saveDescriptionButton = contentEl.createEl("button", { text: "Save Description" });
 		saveDescriptionButton.classList.add("save-button");
 
@@ -271,15 +240,11 @@ export class IssuesDetailsModal extends Modal {
 		const comments = await api_get_issue_comments(this.octokit, this.issue);
 		spinner2.remove();
 		if (!comments) {
-			contentEl.createEl("h3", { text: "Could not fetch comments" });
+			contentEl.createEl("h5", { text: "Could not fetch comments" });
 			return;
 		}
 
-		if (comments.length > 0) {
-			contentEl.createEl("h3", { text: "Comments" });
-		}
-
-		comments.forEach(comment => {
+			comments.forEach(comment => {
 			const commentsContainer = contentEl.createDiv();
 			commentsContainer.classList.add("issues-comments-container")
 
@@ -290,7 +255,8 @@ export class IssuesDetailsModal extends Modal {
 			authorIcon.classList.add("issues-author-icon")
 			authorIcon.src = comment?.avatar_url;
 
-			const authorName = authorContainer.createEl("span", { text: comment?.login });
+			let header_text = comment?.login + " commented " + getPasteableTimeDelta(comment?.update_at);
+			const authorName = authorContainer.createEl("span", { text: header_text });
 			authorName.classList.add("issues-author-name")
 
 			const commentBody = commentsContainer.createDiv();
@@ -352,5 +318,50 @@ export class IssuesDetailsModal extends Modal {
 				button.classList.remove("visible");
 			}
 		});
+	}
+}
+
+function appendLabelCheckboxes (
+	labelsGrid: HTMLElement,
+	originalSelections: Set,
+	labels: Label[],
+	checkboxes: HTMLElement[]
+) {
+	for (let i = 0; i < Math.floor(labels.length/2); i ++) {
+		const row = labelsGrid.createDiv();
+		if (i == 0) {
+			row.classList.add("labels-row-first");
+		}
+		else {
+			row.classList.add("labels-row");
+		}
+
+		// First label
+		const labelContainer1 = row.createDiv();
+		labelContainer1.classList.add("label-grid-container");
+		const labelCheckbox1 = labelContainer1.createEl("input", {
+			type: "checkbox",
+			value: labels[i].name
+		});
+		labelCheckbox1.checked = originalSelections.has(labels[i].name);
+		checkboxes.push(labelCheckbox1);
+		const labelLabel1 = labelContainer1.createEl("label", { text: labels[i].name });
+		labelLabel1.htmlFor = labels[i].name;
+
+		// Second label (if exists)
+		let n = i + Math.floor(labels.length/2);
+
+		if (n < labels.length) {
+			const labelContainer2 = row.createDiv();
+			labelContainer2.classList.add("label-grid-container");
+			const labelCheckbox2 = labelContainer2.createEl("input", {
+				type: "checkbox",
+				value: labels[n].name
+			});
+			labelCheckbox2.checked = originalSelections.has(labels[n].name);
+			checkboxes.push(labelCheckbox2);
+			const labelLabel2 = labelContainer2.createEl("label", { text: labels[n].name });
+			labelLabel2.htmlFor = labels[n].name;
+		}
 	}
 }

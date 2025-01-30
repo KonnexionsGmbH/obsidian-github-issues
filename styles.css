@@ -50,21 +50,15 @@
 
 /* Issue Details Modal Stuff */
 
-.issues-repo {
-	margin: 5px 0 0;
-	padding: 0;
-	opacity: 0.7;
-}
-
 .issues-author {
 	margin: 5px 0 0;
 	padding: 0;
-	opacity: 0.7;
+	opacity: 1.0;
 }
 
 .issue-link {
-	font-size: 0.8em;
-	opacity: 0.7;
+	padding-top: 10px;
+	text-align: right;
 }
 
 .issues-state-and-label-container {
@@ -74,8 +68,14 @@
 	justify-content: start;
 	padding-top: 10px;
 	color: white;
-}
+	font-size: 0.8em;
+}	
 
+.created-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
 
 .label-container {
 	display: flex;
@@ -91,19 +91,27 @@
 	border-radius: 10px;
 	margin-right: 5px;
 	padding: 5px;
+	font-size: 10px;
 }
 
 .labels-grid {
-	margin-top: 20px;
+	margin-top: 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 5px;
+}
+
+.labels-row-first {
+    display: grid;
+	padding-top: 8px;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
 }
 
 .labels-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 14px;
 }
 
 .label-grid-container {
@@ -124,7 +132,7 @@
 	justify-content: start;
 	gap: 5px;
 	padding: 0;
-	opacity: 0.7;
+	opacity: 1.0;
 }
 
 .issues-label-pill {
@@ -136,6 +144,7 @@
 	padding: 5px;
 	border-radius: 10px;
 	margin: 0;
+	font-size: 10px;
 }
 
 .issues-label-name {
@@ -147,7 +156,6 @@
 	flex-direction: row;
 	align-items: start;
 	justify-content: start;
-	padding-top: 20px;
 }
 
 .issues-assignee-icon {
@@ -183,7 +191,7 @@
 .issues-container-title {
 	margin: 0;
 	padding: 0;
-	font-size: 1.2em;
+	font-size: 1em;
 }
 
 .issues-body {
@@ -207,7 +215,6 @@
 .issues-title-text {
 	margin: 0;
 	padding: 0;
-	font-size: 2.0em;
 	white-space: pre-wrap;
 }
 
@@ -217,18 +224,18 @@
 	max-height: fit-content;
 	min-height: 30px;
 	border-radius: var(--radius-s);
-	font-size: 1.1em;
+	font-size: 1em;
 }
 
 .issues-description-input {
-    margin-top: 30px;
+    margin-top: 10px;
     width: 100%;
-    min-height: 30px;
+    min-height: 80px;
     height: auto;
     max-height: calc(1.5em * 10 + 16px);
     resize: vertical;
     border-radius: var(--radius-s);
-    font-size: 1.05em;
+    font-size: 1em;
     line-height: 1.5;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -239,7 +246,7 @@
 
 .description-container {
     position: relative;
-    margin-top: 30px;
+    margin-top: 10px;
 }
 
 .description-preview {
@@ -254,7 +261,6 @@
     position: absolute;
     top: -40px;
     right: 0;
-    font-size: 0.9em;
 }
 
 .issues-comments-container {
@@ -295,7 +301,6 @@
 .issues-comment-text {
 	margin: 0;
 	padding: 0;
-	font-size: 1.05em;
 	white-space: pre-wrap;
 }
 
@@ -378,11 +383,10 @@
 }
 
 .issues-modal-item-title {
-	font-size: 1.1em;
+	font-size: 1em;
 }
 
 .issues-item-subtitle {
-	font-size: 0.8em;
 	padding-top: 2px;
 }
 
@@ -432,18 +436,17 @@
 }
 
 .issue-details-text {
-	font-size: 14px;
 	margin-left: 7px;
 	margin-bottom: 7px;
-	opacity: 0.7;
+	opacity: 1.0;
 }
 
 .labelEl {
 	padding: 2px;
 	margin: 2px;
-	border-radius: var(--radius-s);
-	font-size: 10px;
-	opacity: 0.8;
+	border-radius: 10px;
+	opacity: 1.0;
+	font-size: 12px;
 }
 
 .new-issues-modal-titleInput {
@@ -460,7 +463,6 @@
 	margin-bottom: 10px;
 	max-height: fit-content;
 	font-family: "monospace";
-	font-size: 12px;
 }
 
 .new-issues-modal-selectedLabels {
@@ -475,7 +477,6 @@
 	height: 30px;
 	max-height: 30px;
 	max-width: 100%;
-	font-size: 12px;
 	border-radius: 5px;
 }
 

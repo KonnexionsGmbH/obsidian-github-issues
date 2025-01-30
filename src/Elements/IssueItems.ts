@@ -19,7 +19,7 @@ export function createDefaultIssueElement(
 ) {
 	const container = el.createDiv({ cls: "issue-container" });
 
-	const title = container.createEl("h5", { text: issue.title });
+	const title = container.createEl("h6", { text: issue.title });
 	title.classList.add("issue-title");
 
 	const details = container.createDiv({ cls: "issue-details" });
