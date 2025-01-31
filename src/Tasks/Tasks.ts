@@ -8,10 +8,10 @@ export class Task {
     end:   number;              // next line after Feature or ReleasesNote.length  
     title: string;              // text without tags
     task_labels: TaskLabels;    // feature tags, normal tags, platform tags, issue tags (max. one)
-    sort_string: string;
+    sort_string: string[];
     status_code: string;        // " ": todo, "x":done, "s": assigned Sven, "S": working Sven, etc.
 
-    constructor(start: number, end: number, title: string, task_labels: TaskLabels, sort_string: string, status_code: string) {
+    constructor(start: number, end: number, title: string, task_labels: TaskLabels, sort_string: string[], status_code: string) {
         this.start = start;
         this.end = end;
         this.title = title;
