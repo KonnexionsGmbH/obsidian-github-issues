@@ -43,7 +43,7 @@ export class IssuesDetailsModal extends Modal {
 				title: titleInput.value
 			});
 			if (updated) {
-				// reRenderView(this.app);
+				this.close();
 				new Notice("Issue Title updated");
 			} else {
 				new Notice("Could not update issue");
@@ -135,9 +135,9 @@ export class IssuesDetailsModal extends Modal {
 			const originalSelections = new Set(details.labels.map(label => label.name));
 			const checkboxes: HTMLInputElement[] = [];
 
-			appendLabelCheckboxes (labelsGrid, originalSelections, allLabels.feature_labels, checkboxes);
-			appendLabelCheckboxes (labelsGrid, originalSelections, allLabels.normal_labels, checkboxes);
-			appendLabelCheckboxes (labelsGrid, originalSelections, allLabels.platform_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.feature_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.normal_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.platform_labels, checkboxes);
 
 			const saveLabelsButton = contentEl.createEl("button", { text: "Save Labels" });
 			saveLabelsButton.classList.add("save-button");
@@ -165,11 +165,12 @@ export class IssuesDetailsModal extends Modal {
 			});
 
 			saveLabelsButton.onclick = async () => {
+				const labels = [...allLabels.feature_labels, ...allLabels.normal_labels, ...allLabels.platform_labels];
 				const selectedLabels = Array.from(labelsGrid.querySelectorAll("input:checked")).map((checkbox: HTMLInputElement) => checkbox.value);
-				console.log(selectedLabels);
 				const updated = await api_set_labels_on_issue(this.octokit, this.issue, selectedLabels);
 				if (updated) {
 					new Notice("Labels updated");
+					this.issue.task_labels = new TaskLabels(selectedLabels.map(label => {	return { name: label, color: labels.find(l => l.name == label)?.color } as Label; }));
 					this.close();
 				} else {
 					new Notice("Could not update labels");
@@ -180,40 +181,64 @@ export class IssuesDetailsModal extends Modal {
 		const descriptionContainer = contentEl.createDiv();
 		descriptionContainer.classList.add("description-container");
 
-		const descriptionInput = descriptionContainer.createEl("textarea", { text: details.body });
+		const previewDiv = descriptionContainer.createDiv();
+		previewDiv.classList.add("description-preview");
+
+		// Initial markdown render
+		await MarkdownRenderer.render(
+			this.app,
+			details.body,
+			previewDiv,
+			'',
+			new Component()
+		);
+
+		const autoResizeTextarea = (textarea: HTMLTextAreaElement) => {
+			textarea.style.height = 'auto';
+			textarea.style.height = `${textarea.scrollHeight}px`;
+		};
+
+		const descriptionInput = contentEl.createEl("textarea", { text: details.body });
 		descriptionInput.classList.add("issues-description-input");
-		if (details.body) {
-			descriptionInput.rows = Math.min(details.body.split('\n').length, 10);
-		}
+		descriptionInput.style.display = "none";
 
-/*		const previewContainer = descriptionContainer.createDiv();
-		previewContainer.classList.add("description-preview");
-		previewContainer.style.display = "none";
+		// Initial size adjustment
+		autoResizeTextarea(descriptionInput);
 
-		const toggleButton = descriptionContainer.createEl("button", { text: "Preview" });
-		toggleButton.classList.add("toggle-preview-button");
-
-		toggleButton.addEventListener("click", async () => {
-			if (previewContainer.style.display === "none") {
-				// Switch to preview
-				previewContainer.empty();
-				await MarkdownRenderer.renderMarkdown(
-					descriptionInput.value, 
-					previewContainer, 
-					"", 
-					Component.prototype
-				);
-				descriptionInput.style.display = "none";
-				previewContainer.style.display = "block";
-				toggleButton.setText("Edit");
-			} else {
-				// Switch to edit
-				descriptionInput.style.display = "block";
-				previewContainer.style.display = "none";
-				toggleButton.setText("Preview");
-			}
+		// Resize on input
+		descriptionInput.addEventListener("input", () => {
+			autoResizeTextarea(descriptionInput);
 		});
-*/
+
+		// Switch to edit mode on preview click
+		previewDiv.addEventListener("click", () => {
+			previewDiv.style.display = "none";
+			descriptionInput.style.display = "block";
+			descriptionInput.focus();
+			autoResizeTextarea(descriptionInput);
+		});
+
+		// Switch to edit mode on preview click
+		previewDiv.addEventListener("click", () => {
+			previewDiv.style.display = "none";
+			descriptionInput.style.display = "block";
+			descriptionInput.focus();
+		});
+
+		// Switch back to preview on blur
+		descriptionInput.addEventListener("blur", async () => {
+			previewDiv.empty();
+			await MarkdownRenderer.render(
+				this.app,
+				descriptionInput.value,
+				previewDiv,
+				'',
+				new Component()
+			);
+			descriptionInput.style.display = "none";
+			previewDiv.style.display = "block";
+		});
+
 		const saveDescriptionButton = contentEl.createEl("button", { text: "Save Description" });
 		saveDescriptionButton.classList.add("save-button");
 
@@ -224,15 +249,12 @@ export class IssuesDetailsModal extends Modal {
 				body: descriptionInput.value
 			});
 			if (updated) {
-				// reRenderView(this.app);
 				new Notice("Issue Description updated");
+				this.close
 			} else {
 				new Notice("Could not update issue");
 			}
 		}
-
-		//load the comments 
-		// MarkdownRenderer.render(this.app, details?.body, body, "", Component.prototype);
 
 		//load the comments
 		const spinner2 = loadingSpinner();
@@ -244,7 +266,7 @@ export class IssuesDetailsModal extends Modal {
 			return;
 		}
 
-			comments.forEach(comment => {
+		comments.forEach(comment => {
 			const commentsContainer = contentEl.createDiv();
 			commentsContainer.classList.add("issues-comments-container")
 
@@ -263,7 +285,13 @@ export class IssuesDetailsModal extends Modal {
 			commentBody.classList.add("issues-comment-body")
 
 			const commentText = commentBody.createEl("span");
-			MarkdownRenderer.renderMarkdown(comment?.body, commentText, "", Component.prototype);
+			MarkdownRenderer.render(
+				this.app,
+				comment?.body,
+				commentText,
+				'',
+				new Component()
+			);
 			commentText.classList.add("issues-comment-text")
 			commentText.classList.add("selectable-text");
 
@@ -319,49 +347,60 @@ export class IssuesDetailsModal extends Modal {
 			}
 		});
 	}
-}
-
-function appendLabelCheckboxes (
-	labelsGrid: HTMLElement,
-	originalSelections: Set,
-	labels: Label[],
-	checkboxes: HTMLElement[]
-) {
-	for (let i = 0; i < Math.floor(labels.length/2); i ++) {
-		const row = labelsGrid.createDiv();
-		if (i == 0) {
-			row.classList.add("labels-row-first");
-		}
-		else {
-			row.classList.add("labels-row");
-		}
-
-		// First label
-		const labelContainer1 = row.createDiv();
-		labelContainer1.classList.add("label-grid-container");
-		const labelCheckbox1 = labelContainer1.createEl("input", {
-			type: "checkbox",
-			value: labels[i].name
-		});
-		labelCheckbox1.checked = originalSelections.has(labels[i].name);
-		checkboxes.push(labelCheckbox1);
-		const labelLabel1 = labelContainer1.createEl("label", { text: labels[i].name });
-		labelLabel1.htmlFor = labels[i].name;
-
-		// Second label (if exists)
-		let n = i + Math.floor(labels.length/2);
-
-		if (n < labels.length) {
-			const labelContainer2 = row.createDiv();
-			labelContainer2.classList.add("label-grid-container");
-			const labelCheckbox2 = labelContainer2.createEl("input", {
+	
+	private appendLabelCheckboxes(
+		labelsGrid: HTMLElement,
+		originalSelections: Set<String>,
+		labels: Label[],
+		checkboxes: HTMLElement[]
+	) {
+		for (let i = 0; i < Math.floor(labels.length / 2); i++) {
+			const row = labelsGrid.createDiv();
+			if (i == 0) {
+				row.classList.add("labels-row-first");
+			}
+			else {
+				row.classList.add("labels-row");
+			}
+	
+			// First label
+			const labelContainer1 = row.createDiv();
+			labelContainer1.classList.add("label-grid-container");
+			const labelCheckbox1 = labelContainer1.createEl("input", {
 				type: "checkbox",
-				value: labels[n].name
+				value: labels[i].name
 			});
-			labelCheckbox2.checked = originalSelections.has(labels[n].name);
-			checkboxes.push(labelCheckbox2);
-			const labelLabel2 = labelContainer2.createEl("label", { text: labels[n].name });
-			labelLabel2.htmlFor = labels[n].name;
+			labelCheckbox1.checked = originalSelections.has(labels[i].name);
+			checkboxes.push(labelCheckbox1);
+			const labelLabel1 = labelContainer1.createEl("label", { text: labels[i].name });
+			labelLabel1.htmlFor = labels[i].name;
+	
+			this.appendColorCircle(labelContainer1, labels[i].color);
+			
+			// Second label (if exists)
+			let n = i + Math.floor(labels.length / 2);
+			
+			if (n < labels.length) {
+				const labelContainer2 = row.createDiv();
+				labelContainer2.classList.add("label-grid-container");
+				const labelCheckbox2 = labelContainer2.createEl("input", {
+					type: "checkbox",
+					value: labels[n].name
+				});
+				labelCheckbox2.checked = originalSelections.has(labels[n].name);
+				checkboxes.push(labelCheckbox2);
+				const labelLabel2 = labelContainer2.createEl("label", { text: labels[n].name });
+				labelLabel2.htmlFor = labels[n].name;
+				
+				this.appendColorCircle(labelContainer2, labels[i].color);
+			}
 		}
 	}
+
+	private appendColorCircle(container: HTMLElement, color: string): void {
+		const colorCircle = container.createSpan();
+		colorCircle.classList.add("label-color-circle");
+		colorCircle.style.backgroundColor = `#${color}`;
+	}
 }
+

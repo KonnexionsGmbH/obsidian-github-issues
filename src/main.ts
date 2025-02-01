@@ -10,10 +10,7 @@ import { IssuesModal } from "./Elements/Modals/IssuesModal";
 import { Octokit } from "@octokit/core";
 import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
-import {
-	createCompactIssueElement,
-	createDefaultIssueElement,
-} from "./Elements/IssueItems";
+import { IssueItems } from "./Elements/IssueItems";
 import { Issue, TaskLabels, getIssueSortKey } from "./Issues/Issue";
 import { Feature, Task } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
@@ -23,7 +20,7 @@ import { reRenderView } from "./Utils/Utils";
 //enum for the appearance of the issues when pasted into the editor
 export enum IssueAppearance {
 	DEFAULT = "default",
-	COMPACT = "compact", 
+	COMPACT = "compact",
 }
 
 interface MyPluginSettings {
@@ -45,13 +42,13 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 function finishTask(this_task: string, tacc: Task[], i: number): string {
 	// may be called without open task(this_task == "")
 	if (this_task.length > 0) {
-		if (tacc[tacc.length-1].end == 0) {
-			tacc[tacc.length-1].end = i;
+		if (tacc[tacc.length - 1].end == 0) {
+			tacc[tacc.length - 1].end = i;
 		} else {
 			console.log("Cannot re-finish in finishTask")
 		}
 	} else if (tacc.length > 0) {
-		if (tacc[tacc.length-1].end == 0) {
+		if (tacc[tacc.length - 1].end == 0) {
 			console.log("this_task is empty in finishTask()")
 		}
 	};
@@ -70,7 +67,7 @@ function startNewTask(this_task: string, tacc: Task[], i: number, line: string):
 	// - [ ] #task One more task #Core #Server #102 🔺 🔁 every day 🛫 2025-02-01 ❌ 2025-01-31
 	// - [ ] #task One more task #Core #Server #102 ⏬ 🛫 2025-02-01
 	// - [x] #task Description comes here 🆔 uo7126 ⛔ t3ls4p ⏫ ➕ 2025-02-03 ⏳ 2025-01-24 📅 2025-02-07
-	
+
 	const prios = "⏬🔽 🔼⏫🔺";		// prio0 .. prio5, prio2 = normal doesnot happen
 	const dates = "➕⏳📅🛫✅❌🔁";
 	const links = "⛔🆔";
@@ -82,26 +79,26 @@ function startNewTask(this_task: string, tacc: Task[], i: number, line: string):
 	let done = false;
 	words.forEach((word) => {
 		if (done == false) {
-			let prio = prios.indexOf(word.substring(0,1)); 
-			if (prio > 3 ) {
+			let prio = prios.indexOf(word.substring(0, 1));
+			if (prio > 3) {
 				mapped_labels.push({
 					name: "p_critical",
 					color: "#D93F0B"
 				} as Label);
 				done = true;
-			} else if (prio > 2 ) {
+			} else if (prio > 2) {
 				mapped_labels.push({
 					name: "p_high",
 					color: "#E99695"
 				} as Label);
 				done = true;
-			} else if (prio > 0 ) {
+			} else if (prio > 0) {
 				mapped_labels.push({
 					name: "p_low",
 					color: "#9CE8C6"
 				} as Label);
 				done = true;
-			}  else if (prio == 0 ) {
+			} else if (prio == 0) {
 				mapped_labels.push({
 					name: "p_backlog",
 					color: "#49EE25"
@@ -124,20 +121,20 @@ function startNewTask(this_task: string, tacc: Task[], i: number, line: string):
 	})
 	this_task = titles.join(" ");
 	const tl = new TaskLabels(mapped_labels);
-	tacc.push( new Task(i, 0, this_task , tl, getIssueSortKey(this_task, tl), line.substring(task_pos-3,task_pos-2)));
+	tacc.push(new Task(i, 0, this_task, tl, getIssueSortKey(this_task, tl), line.substring(task_pos - 3, task_pos - 2)));
 	return this_task;
 }
 
 
 function finishFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i: number): string {
 
-	if (facc[facc.length-1].tag == this_feature) {
-		tacc[tacc.length-1].end = i;
-		facc[facc.length-1].end = i;
+	if (facc[facc.length - 1].tag == this_feature) {
+		tacc[tacc.length - 1].end = i;
+		facc[facc.length - 1].end = i;
 		if (this_task.length > 0) {
 			finishTask(this_task, tacc, i);
 		}
-		facc[facc.length-1].tasks = tacc;
+		facc[facc.length - 1].tasks = tacc;
 		tacc = [];
 	} else {
 		console.log("Tag not matching in finishFeature()");
@@ -146,7 +143,7 @@ function finishFeature(this_feature: string, this_task: string, facc: Feature[],
 	return this_feature;
 }
 
-function startNewFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i:number, line: string): string {
+function startNewFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i: number, line: string): string {
 	if (this_feature.length > 0) {
 		finishFeature(this_feature, this_task, facc, tacc, i);
 	}
@@ -232,7 +229,7 @@ export default class MyPlugin extends Plugin {
 					});
 				}
 
-				let issues: Issue[] = []; 
+				let issues: Issue[] = [];
 				if (parsedIssues.length != 0) {
 					issues = await api_get_issues_by_id(
 						this.octokit,
@@ -243,7 +240,7 @@ export default class MyPlugin extends Plugin {
 					issues = await api_get_own_issues(this.octokit, repo);
 				}
 
-  				issues = issues.sort((s1,s2) => {
+				issues = issues.sort((s1, s2) => {
 					if (s1.sort_string > s2.sort_string) {
 						return 1;
 					}
@@ -258,7 +255,7 @@ export default class MyPlugin extends Plugin {
 				var tacc: Task[] = [];
 				this.app.workspace.iterateRootLeaves((leaf) => {
 					if ((leaf.getDisplayText() == "IO-XPA Releases") && (leaf.getViewState().type == "markdown")) {
-						this.app.workspace.setActiveLeaf(leaf, {focus: false});
+						this.app.workspace.setActiveLeaf(leaf, { focus: false });
 						if (leaf.view) {
 							const editor = leaf.view.editor;
 							console.log("EditorLineCount: ", editor.lineCount());
@@ -274,20 +271,20 @@ export default class MyPlugin extends Plugin {
 									if ((line.indexOf("#hidden") == -1) && (line.startsWith("### #"))) { // new feature
 										this_feature = startNewFeature(this_feature, this_task, facc, tacc, i, line);
 										this_task = "";
-										tacc= [];
-									} else if (line.startsWith("####")){
+										tacc = [];
+									} else if (line.startsWith("####")) {
 										// skip headings of levels 4,5 and 6. May belong to features or tasks
 									} else if (line.startsWith("#")) {
 										this_feature = finishFeature(this_feature, this_task, facc, tacc, i);
 									} else if ((line.indexOf("#task") > 3) && (line.contains("- ["))) {
 										this_task = startNewTask(this_task, tacc, i, line); // but finish this_task first if needed
-									} 
+									}
 								}
 							}
 							if (this_feature.length > 0) {
 								this_feature = finishFeature(this_feature, this_task, facc, tacc, editor.lineCount());
 							}
-							console.log(facc); 
+							console.log(facc);
 						}
 					}
 				})
@@ -295,7 +292,7 @@ export default class MyPlugin extends Plugin {
 				issues.forEach((issue) => {
 					switch (this.settings.issue_appearance) {
 						case IssueAppearance.DEFAULT:
-							createDefaultIssueElement(
+							IssueItems.createDefaultIssueElement(
 								el,
 								issue,
 								this.octokit,
@@ -303,7 +300,7 @@ export default class MyPlugin extends Plugin {
 							);
 							break;
 						case IssueAppearance.COMPACT:
-							createCompactIssueElement(
+							IssueItems.createCompactIssueElement(
 								el,
 								issue,
 								this.octokit,
@@ -441,7 +438,6 @@ class GithubIssuesSettings extends PluginSettingTab {
 					.setPlaceholder("XXXXXXXXXXXXXXX")
 					.setValue(this.plugin.settings.password)
 					.onChange(async (value) => {
-						console.log("Password: " + value);
 						this.plugin.settings.password = value;
 						await this.plugin.saveSettings();
 						//trigger reauthentication
