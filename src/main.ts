@@ -44,9 +44,6 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 
 function finishTask(this_task: string, tacc: Task[], i: number): string {
 	// may be called without open task(this_task == "")
-
-	console.log("finishTask line: ", i, this_task);
-
 	if (this_task.length > 0) {
 		if (tacc[tacc.length-1].end == 0) {
 			tacc[tacc.length-1].end = i;
@@ -80,13 +77,11 @@ function startNewTask(this_task: string, tacc: Task[], i: number, line: string):
 	const task_pos = line.indexOf("#task");
 	const title_pos = task_pos + 6;
 	const words: string[] = line.substring(title_pos).split(" ");
-	// console.log("words: ", words);
 	let mapped_labels: Label[] = [];
 	let titles: string[] = [];
 	let done = false;
 	words.forEach((word) => {
 		if (done == false) {
-			console.log("word: ", word);
 			let prio = prios.indexOf(word.substring(0,1)); 
 			if (prio > 3 ) {
 				mapped_labels.push({
@@ -94,35 +89,29 @@ function startNewTask(this_task: string, tacc: Task[], i: number, line: string):
 					color: "#D93F0B"
 				} as Label);
 				done = true;
-				console.log("prio4");
 			} else if (prio > 2 ) {
 				mapped_labels.push({
 					name: "p_high",
 					color: "#E99695"
 				} as Label);
 				done = true;
-				console.log("prio3");
 			} else if (prio > 0 ) {
 				mapped_labels.push({
 					name: "p_low",
 					color: "#9CE8C6"
 				} as Label);
 				done = true;
-				console.log("prio1");
 			}  else if (prio == 0 ) {
 				mapped_labels.push({
 					name: "p_backlog",
 					color: "#49EE25"
 				} as Label);
 				done = true;
-				console.log("prio0");
 			}
 			if (dates.contains(word)) {
 				done = true;
-				console.log("date");
 			} else if (links.contains(word)) {
 				done = true;
-				console.log("link");
 			} else if (word.startsWith("#")) {
 				mapped_labels.push({
 					name: word,
@@ -134,7 +123,6 @@ function startNewTask(this_task: string, tacc: Task[], i: number, line: string):
 		}
 	})
 	this_task = titles.join(" ");
-	console.log("startNewTask line: ", i, " ", this_task, " labels: ", mapped_labels.length);
 	const tl = new TaskLabels(mapped_labels);
 	tacc.push( new Task(i, 0, this_task , tl, getIssueSortKey(this_task, tl), line.substring(task_pos-3,task_pos-2)));
 	return this_task;
@@ -142,8 +130,6 @@ function startNewTask(this_task: string, tacc: Task[], i: number, line: string):
 
 
 function finishFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i: number): string {
-
-	console.log("finishFeature line: ", i, " ", this_feature);
 
 	if (facc[facc.length-1].tag == this_feature) {
 		tacc[tacc.length-1].end = i;
@@ -166,7 +152,6 @@ function startNewFeature(this_feature: string, this_task: string, facc: Feature[
 	}
 	const words = line.split(" ");
 	this_feature = words[1];
-	console.log("startNewFeature : ", i," ", this_feature);
 	facc.push(new Feature(i, 0, this_feature, false, []));
 	return this_feature;
 }
@@ -273,14 +258,12 @@ export default class MyPlugin extends Plugin {
 				var tacc: Task[] = [];
 				this.app.workspace.iterateRootLeaves((leaf) => {
 					if ((leaf.getDisplayText() == "IO-XPA Releases") && (leaf.getViewState().type == "markdown")) {
-						console.log("Workspace Leaf: ", leaf.getDisplayText(), " ", leaf.getViewState().type);
 						this.app.workspace.setActiveLeaf(leaf, {focus: false});
 						if (leaf.view) {
 							const editor = leaf.view.editor;
 							console.log("EditorLineCount: ", editor.lineCount());
 							for (let i = 0; i < editor.lineCount(); i++) {
 								let line = editor.getLine(i);
-								// console.log("Line: " , i, line);
 								if (this_feature == "") { // look for a new feature
 									if ((line.indexOf("#hidden") == -1) && (line.startsWith("### #"))) {
 										this_feature = startNewFeature(this_feature, this_task, facc, tacc, i, line);
