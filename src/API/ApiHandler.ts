@@ -49,6 +49,28 @@ export async function api_get_repos(octokit: Octokit) {
 }
 
 /**
+ * Creates new labels on GitHub
+ * @param octokit
+ */
+
+export async function api_create_new_label(octokit: Octokit, repo: RepoItem | null, name: string) {
+	if (repo == null) return false;
+	const res = await octokit.request('POST /repos/{owner}/{repo}/labels', {
+	owner: repo.owner,
+	repo: repo.name,
+	name: name,
+	description: 'Feature Label',
+	color: 'aaaaaa',
+	headers: {
+	  'X-GitHub-Api-Version': '2022-11-28'
+	}
+  })
+  return res.status == 201;
+}
+
+
+
+/**
  * Returns all the labels of a repo as an array of strings with their names
  * @param octokit
  * @param repo
@@ -69,12 +91,10 @@ export async function api_get_labels(octokit: Octokit, repo: RepoItem): Promise<
 				name: label.name,
 				color: label.color
 			} as Label;
-		})
-		// const tl = new TaskLabels(mapped_labels);
-		// return tl.feature_labels.concat(tl.normal_labels).concat(tl.platform_labels);
+		});
 		return new TaskLabels(mapped_labels);
 	} else {
-		return new TaskLabels([]);;
+		return new TaskLabels([])
 	}
 }
 
@@ -112,6 +132,13 @@ export async function api_submit_issue(octokit: Octokit, repo: RepoItem | null, 
 export async function api_get_issues_by_url(octokit: Octokit, url: string): Promise<Issue[]> {
 
 	const { owner, repo } = parseRepoUrl(url);
+	const repoItem: RepoItem = {
+		owner: owner,
+		name: repo,
+		id: 0,
+		language: "",
+		updated_at: "",
+	};
 	const issues: Issue[] = [];
 	console.debug("api_get_issues_by_url");
 	try {
@@ -141,7 +168,7 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string): Prom
 					issue.created_at,
 					tl,
 					getIssueSortKey(issue.title, tl),
-					repo
+					repoItem
 				));
 			}
 

@@ -103,7 +103,7 @@ export class CSVIssue extends Issue {
 /*
  * Constructs a string which can be used to sort issues by features then issue title then platforms
  */
-export function getIssueSortKey(title: string, tl: TaskLabels) {
+export function getIssueSortKey(title: string, tl: TaskLabels): string {
 	const res: string[] = [];
 
 	tl.feature_labels.forEach((label) => {
@@ -120,5 +120,5 @@ export function getIssueSortKey(title: string, tl: TaskLabels) {
 		res.push(label.name);
 	});
 
-	return res;
+	return res.join();
 }
