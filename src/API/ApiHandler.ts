@@ -74,7 +74,7 @@ export async function api_get_labels(octokit: Octokit, repo: RepoItem): Promise<
 		// return tl.feature_labels.concat(tl.normal_labels).concat(tl.platform_labels);
 		return new TaskLabels(mapped_labels);
 	} else {
-		return [];
+		return new TaskLabels([]);;
 	}
 }
 

@@ -3,6 +3,7 @@ import {
 	api_authenticate,
 	api_get_issues_by_id,
 	api_get_own_issues,
+	api_get_labels,
 	RepoItem,
 	Label
 } from "./API/ApiHandler";
@@ -48,7 +49,7 @@ function finishTask(this_task: string, tacc: Task[], i: number): string {
 		if (tacc[tacc.length-1].end == 0) {
 			tacc[tacc.length-1].end = i;
 		} else {
-			console.log("Cannot re-finish in finishTask")
+			console.log("Cannot re-finish in finishTask old and new end: ", tacc[tacc.length-1].end, i )
 		}
 	} else if (tacc.length > 0) {
 		if (tacc[tacc.length-1].end == 0) {
@@ -59,9 +60,9 @@ function finishTask(this_task: string, tacc: Task[], i: number): string {
 	return this_task;
 }
 
-function startNewTask(this_task: string, tacc: Task[], i: number, line: string): string {
+function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: number, line: string): string {
 	if (this_task.length > 0) {
-		finishTask(this_task, tacc, i);
+		this_task = finishTask(this_task, tacc, i);
 	}
 	// - [ ] #task One more task #Core #Server #102 🔺 🛫 2025-02-01 ✅ 2025-01-31
 	// - [ ] #task One more task #Core #Server #102 🔼 🛫 2025-02-01
@@ -74,12 +75,20 @@ function startNewTask(this_task: string, tacc: Task[], i: number, line: string):
 	const prios = "⏬🔽 🔼⏫🔺";		// prio0 .. prio5, prio2 = normal doesnot happen
 	const dates = "➕⏳📅🛫✅❌🔁";
 	const links = "⛔🆔";
+	
 	const task_pos = line.indexOf("#task");
 	const title_pos = task_pos + 6;
 	const words: string[] = line.substring(title_pos).split(" ");
+
 	let mapped_labels: Label[] = [];
+	mapped_labels.push({
+		name: this_feature,
+		color: "#AAAAAA"
+	} as Label);
+	
 	let titles: string[] = [];
 	let done = false;
+	
 	words.forEach((word) => {
 		if (done == false) {
 			let prio = prios.indexOf(word.substring(0,1)); 
@@ -132,10 +141,9 @@ function startNewTask(this_task: string, tacc: Task[], i: number, line: string):
 function finishFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i: number): string {
 
 	if (facc[facc.length-1].tag == this_feature) {
-		tacc[tacc.length-1].end = i;
 		facc[facc.length-1].end = i;
 		if (this_task.length > 0) {
-			finishTask(this_task, tacc, i);
+			this_task = finishTask(this_task, tacc, i);
 		}
 		facc[facc.length-1].tasks = tacc;
 		tacc = [];
@@ -148,7 +156,7 @@ function finishFeature(this_feature: string, this_task: string, facc: Feature[],
 
 function startNewFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i:number, line: string): string {
 	if (this_feature.length > 0) {
-		finishFeature(this_feature, this_task, facc, tacc, i);
+		this_feature = finishFeature(this_feature, this_task, facc, tacc, i);
 	}
 	const words = line.split(" ");
 	this_feature = words[1];
@@ -232,6 +240,8 @@ export default class MyPlugin extends Plugin {
 					});
 				}
 
+				const allLabelsPromise: Promise<TaskLabels> = api_get_labels(this.octokit, repo);
+
 				let issues: Issue[] = []; 
 				if (parsedIssues.length != 0) {
 					issues = await api_get_issues_by_id(
@@ -279,15 +289,41 @@ export default class MyPlugin extends Plugin {
 										// skip headings of levels 4,5 and 6. May belong to features or tasks
 									} else if (line.startsWith("#")) {
 										this_feature = finishFeature(this_feature, this_task, facc, tacc, i);
+										this_task = "";
 									} else if ((line.indexOf("#task") > 3) && (line.contains("- ["))) {
-										this_task = startNewTask(this_task, tacc, i, line); // but finish this_task first if needed
+										this_task = startNewTask(this_feature, this_task, tacc, i, line); // but finish this_task first if needed
 									} 
 								}
 							}
 							if (this_feature.length > 0) {
 								this_feature = finishFeature(this_feature, this_task, facc, tacc, editor.lineCount());
+								this_task = "";
 							}
-							console.log(facc); 
+							console.log(facc);
+							
+							const all_labels: TaskLabels = await allLabelsPromise;
+							const repo_labels = new Set<Label>();
+							all_labels.feature_labels.forEach((label) => {
+								repo_labels.add(label);
+							})
+							all_labels.normal_labels.forEach((label) => {
+								repo_labels.add(label);
+							})
+							all_labels.platform_labels.forEach((label) => {
+								repo_labels.add(label);
+							})
+
+							const missing_labels = new Set<Label>();
+							facc.forEach((feature) => {
+								feature.tasks.forEach((task) => {
+									task.task_labels.feature_labels.forEach((label) => {
+										if (!repo_labels.has(label)) {
+											missing_labels.add(label);
+										}
+									}
+								})
+							})
+							/// push missing labels here!
 						}
 					}
 				})
