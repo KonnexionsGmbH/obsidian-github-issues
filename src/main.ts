@@ -5,7 +5,8 @@ import {
 	api_get_own_issues,
 	api_get_labels,
 	RepoItem,
-	Label
+	Label,
+	api_create_new_label
 } from "./API/ApiHandler";
 import { IssuesModal } from "./Elements/Modals/IssuesModal";
 import { Octokit } from "@octokit/core";
@@ -325,7 +326,7 @@ export default class MyPlugin extends Plugin {
 
 					console.log("Missing Labels in GitHub: ", missing_labels);
 
-					missing_labels.forEach((name) => {
+					missing_labels.forEach(async (name) => {
 						const created = await api_create_new_label(
 							this.octokit,
 							repo,
