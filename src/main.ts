@@ -263,7 +263,6 @@ export default class MyPlugin extends Plugin {
 				var this_task = "";
 				var facc: Feature[] = [];
 				var tacc: Task[] = [];
-				/*
 				this.app.workspace.iterateRootLeaves((leaf) => {
 					if ((leaf.getDisplayText() == "IO-XPA Releases") && (leaf.getViewState().type == "markdown")) {
 						this.app.workspace.setActiveLeaf(leaf, { focus: false });
@@ -304,7 +303,45 @@ export default class MyPlugin extends Plugin {
 						}
 					}
 				})
-				*/
+
+				let all_labels: TaskLabels = await allLabelsPromise;
+				if (facc.length > 0)  {
+					const repo_labels = new Set<string>();
+					all_labels.feature_labels.forEach((label) => {
+						repo_labels.add(label.name);
+					});
+					console.log("Labels in GitHub: ", repo_labels);
+
+					const missing_labels = new Set<string>();
+					facc.forEach((feature) => {
+						feature.tasks.forEach((task) => {
+							task.task_labels.feature_labels.forEach((label) => {
+								if (!repo_labels.has(label.name)) {
+									missing_labels.add(label.name);
+								}
+							}
+						)}
+					)});
+
+					console.log("Missing Labels in GitHub: ", missing_labels);
+
+					missing_labels.forEach((name) => {
+						const created = await api_create_new_label(
+							this.octokit,
+							repo,
+							name
+						);		
+						if (created) {
+							all_labels.feature_labels.push({
+								name: name,
+								color: "aaaaaa"
+							} as Label);
+							new Notice("New label created: " + name);
+						} else {
+							new Notice("New label creation failed :" + name);
+						}
+					  });
+				}
 
 				issues.forEach((issue) => {
 					switch (this.settings.issue_appearance) {
