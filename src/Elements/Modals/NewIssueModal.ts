@@ -39,7 +39,7 @@ export class NewIssueModal extends Modal {
 			contentEl.appendChild(spinner);
 			//get the labels
 			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-			const labels: = (
+			const labels = (
 				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				await api_get_labels(this.ocotoBundle.octokit, repo()!)
 			).map((label) => label.name);
