@@ -1,5 +1,4 @@
 .issue-items-container {
-	display: flex;
 	flex-direction: column;
 	align-items: start;
 	justify-content: start;
@@ -361,25 +360,27 @@
 	overflow-wrap: break-word;
 }
 
-.issue-items-details {
-	display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
+.issue-items-details-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 8px;
+    box-sizing: border-box;
+	margin-bottom: 7px;
 }
 
-
 .issue-items-creator-text {
-	margin-left: 7px;
-	margin-bottom: 7px;
-	width: 100%;
-	opacity: 1.0;
+    color: var(--text-muted);
+    font-size: 0.9em;
+    white-space: nowrap;
 }
 
 .issue-items-assignee-text {
-	margin-right: 7px;
-	margin-bottom: 7px;
-	opacity: 1.0;
-	text-align: right;
+    color: var(--text-muted);
+    font-size: 0.9em;
+    text-align: right;
+    white-space: nowrap;
 }
 
 .issue-items-label {
@@ -475,4 +476,22 @@
 .issue-highlighted {
     background-color: var(--background-modifier-hover);
     border-left: 4px solid var(--interactive-accent);
+}
+
+.issue-details-label-grid-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0;
+}
+
+.issue-details-label-grid-container input[type="checkbox"] {
+    margin: 0;
+}
+
+.issue-details-label-pill {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    cursor: pointer;
 }

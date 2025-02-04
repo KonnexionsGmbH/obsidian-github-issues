@@ -172,7 +172,7 @@ export class IssuesDetailsModal extends Modal {
 				if (updated) {
 					new Notice("Labels updated");
 					this.issue.task_labels = new TaskLabels(
-						selectedLabels.map(label => {return { name: label, color: labels.find(l => l.name == label)?.color } as Label;})
+						selectedLabels.map(label => { return { name: label, color: labels.find(l => l.name == label)?.color } as Label; })
 						, this.issue.view_params
 						, this.issue.number);
 					saveLabelsButton.classList.remove("visible");
@@ -353,7 +353,7 @@ export class IssuesDetailsModal extends Modal {
 			}
 		});
 	}
-	
+
 	private appendLabelCheckboxes(
 		labelsGrid: HTMLElement,
 		originalSelections: Set<String>,
@@ -362,50 +362,45 @@ export class IssuesDetailsModal extends Modal {
 	) {
 		for (let i = 0; i < Math.floor(labels.length / 2); i++) {
 			const row = labelsGrid.createDiv();
-			if (i == 0) {
-				row.classList.add("issue-details-labels-row-first");
-			}
-			else {
-				row.classList.add("issue-details-labels-row");
-			}
-	
+			row.classList.add(i === 0 ? "issue-details-labels-row-first" : "issue-details-labels-row");
+
 			// First label
-			const labelContainer1 = row.createDiv();
-			this.appendColorCircle(labelContainer1, labels[i].color);
-			labelContainer1.classList.add("issue-details-label-grid-container");
-			const labelCheckbox1 = labelContainer1.createEl("input", {
-				type: "checkbox",
-				value: labels[i].name
-			});
-			labelCheckbox1.checked = originalSelections.has(labels[i].name);
-			checkboxes.push(labelCheckbox1);
-			const labelLabel1 = labelContainer1.createEl("label", { text: labels[i].name });
-			// labelLabel1.style.backgroundColor = labels[i].color;
-			labelLabel1.htmlFor = labels[i].name;
-				
+			this.createLabelElement(row, labels[i], originalSelections, checkboxes);
+
 			// Second label (if exists)
-			let n = i + Math.floor(labels.length / 2);
-			
-			if (n < labels.length) {
-				const labelContainer2 = row.createDiv();
-				labelContainer2.classList.add("issue-details-label-grid-container");
-				this.appendColorCircle(labelContainer2, labels[n].color);
-				const labelCheckbox2 = labelContainer2.createEl("input", {
-					type: "checkbox",
-					value: labels[n].name
-				});
-				labelCheckbox2.checked = originalSelections.has(labels[n].name);
-				checkboxes.push(labelCheckbox2);
-				const labelLabel2 = labelContainer2.createEl("label", { text: labels[n].name });
-				labelLabel2.htmlFor = labels[n].name;				
+			const secondIndex = i + Math.floor(labels.length / 2);
+			if (secondIndex < labels.length) {
+				this.createLabelElement(row, labels[secondIndex], originalSelections, checkboxes);
 			}
+
 		}
 	}
 
-	private appendColorCircle(container: HTMLElement, color: string): void {
-		const colorCircle = container.createSpan();
-		colorCircle.classList.add("issue-details-label-color-circle");
-		colorCircle.style.backgroundColor = `#${color}`;
+	private createLabelElement(
+		container: HTMLElement,
+		label: Label,
+		originalSelections: Set<String>,
+		checkboxes: HTMLElement[]
+	): void {
+		const labelContainer = container.createDiv();
+		labelContainer.classList.add("issue-details-label-grid-container");
+
+		const labelCheckbox = labelContainer.createEl("input", {
+			type: "checkbox",
+			value: label.name,
+			attr: { id: `label-${label.name}` }
+		});
+		labelCheckbox.checked = originalSelections.has(label.name);
+		checkboxes.push(labelCheckbox);
+
+		const labelPill = labelContainer.createEl("label", {
+			text: label.name,
+			attr: { for: `label-${label.name}` }
+		});
+		labelPill.classList.add("issue-details-label-pill");
+		labelPill.style.background = `#${label.color}`;
+		labelPill.style.color = getTextColor(label.color);
 	}
+
 }
 

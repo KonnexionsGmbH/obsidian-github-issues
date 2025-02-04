@@ -27,18 +27,20 @@ export class IssueItems {
 		title.classList.add("issue-items-title");
 
 		const details = container.createDiv();
-		details.classList.add("issue-items-details");
-		const creatorText = details.createEl("span", {
+		const detailsContainer = details.createDiv();
+		 detailsContainer.classList.add("issue-items-details-container");
+
+		const creatorText = detailsContainer.createEl("span", {
 			text: `#${issue.number} opened ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`
 		});
 		creatorText.classList.add("issue-items-creator-text");
 
 		if (issue.assignee) {
-			const assigneeText = details.createEl("span", {
+			const assigneeText = detailsContainer.createEl("span", {
 				text: `assigned to ${issue.assignee}`
 			});
-			assigneeText.classList.add("issue-items-assignee-text")
-		};
+			assigneeText.classList.add("issue-items-assignee-text");
+		}
 
 		const labelContainer = title.createDiv({ cls: "issue-items-label-container" });
 		const all_labels: Label[] = issue.task_labels.feature_labels.concat(issue.task_labels.normal_labels).concat(issue.task_labels.platform_labels);
@@ -63,15 +65,15 @@ export class IssueItems {
 		});
 	}
 
-    private static highlightIssue(container: HTMLElement) {
-        if (IssueItems.lastHighlightedIssue) {
-            IssueItems.lastHighlightedIssue.classList.remove('issue-highlighted');
-            IssueItems.lastHighlightedIssue.style.opacity = "1";
-        }
-        container.classList.add('issue-highlighted');
-        container.style.opacity = "0.8";
-        IssueItems.lastHighlightedIssue = container;
-    }
+	private static highlightIssue(container: HTMLElement) {
+		if (IssueItems.lastHighlightedIssue) {
+			IssueItems.lastHighlightedIssue.classList.remove('issue-highlighted');
+			IssueItems.lastHighlightedIssue.style.opacity = "1";
+		}
+		container.classList.add('issue-highlighted');
+		container.style.opacity = "0.8";
+		IssueItems.lastHighlightedIssue = container;
+	}
 
 	private static openIssueDetailsModal(app: App, container: HTMLDivElement, parent: HTMLElement, issue: Issue, ocotokit: Octokit, type: 'default' | 'compact') {
 		container.style.opacity = "0.5";
