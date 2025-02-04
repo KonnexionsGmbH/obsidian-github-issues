@@ -74,8 +74,8 @@ export class IssuesDetailsModal extends Modal {
 			text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
 		});
 
-		const issueLink = createdContainer.createEl("a", { text: this.issue.repo?.name + ` #` + this.issue.number });
-		issueLink.setAttribute("href", "https://github.com/" + this.issue.repo?.owner + "/" + this.issue.repo?.name + "/issues/" + this.issue.number);
+		const issueLink = createdContainer.createEl("a", { text: this.issue.view_params?.repo + ` #` + this.issue.number });
+		issueLink.setAttribute("href", "https://github.com/" + this.issue.view_params?.owner + "/" + this.issue.view_params?.repo + "/issues/" + this.issue.number);
 		issueLink.classList.add("issue-link")
 
 		if (details.assignee.login != undefined) {
@@ -114,7 +114,7 @@ export class IssuesDetailsModal extends Modal {
 				color: label.color
 			} as Label;
 		})
-		const tl = new TaskLabels(mapped_labels);
+		const tl = new TaskLabels(mapped_labels, this.issue.view_params);
 		const sorted_labels: Label[] = tl.feature_labels.concat(tl.normal_labels).concat(tl.platform_labels);
 
 		//loop through the labels
@@ -131,8 +131,8 @@ export class IssuesDetailsModal extends Modal {
 		const labelsGrid = contentEl.createDiv();
 		labelsGrid.classList.add("labels-grid");
 
-		if (this.issue.repo != null) {
-			const allLabels = await api_get_labels(this.octokit, this.issue.repo);
+		if (this.issue.view_params != null) {
+			const allLabels = await api_get_labels(this.octokit, this.issue.view_params);
 			const originalSelections = new Set(details.labels.map(label => label.name));
 			const checkboxes: HTMLInputElement[] = [];
 
@@ -171,7 +171,10 @@ export class IssuesDetailsModal extends Modal {
 				const updated = await api_set_labels_on_issue(this.octokit, this.issue, selectedLabels);
 				if (updated) {
 					new Notice("Labels updated");
-					this.issue.task_labels = new TaskLabels(selectedLabels.map(label => {	return { name: label, color: labels.find(l => l.name == label)?.color } as Label; }));
+					this.issue.task_labels = new TaskLabels(
+						selectedLabels.map(label => {return { name: label, color: labels.find(l => l.name == label)?.color } as Label;})
+						, this.issue.view_params
+						, this.issue.number);
 					saveLabelsButton.classList.remove("visible");
 					// this.close();
 				} else {
@@ -377,6 +380,7 @@ export class IssuesDetailsModal extends Modal {
 			labelCheckbox1.checked = originalSelections.has(labels[i].name);
 			checkboxes.push(labelCheckbox1);
 			const labelLabel1 = labelContainer1.createEl("label", { text: labels[i].name });
+			// labelLabel1.style.backgroundColor = labels[i].color;
 			labelLabel1.htmlFor = labels[i].name;
 				
 			// Second label (if exists)

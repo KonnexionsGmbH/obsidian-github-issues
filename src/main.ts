@@ -1,7 +1,6 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, View, Editor, WorkspaceLeaf } from "obsidian";
+import { App, Notice, Plugin, PluginSettingTab, Setting, MarkdownView, Editor} from "obsidian";
 import {
 	api_authenticate,
-	api_get_issues_by_id,
 	api_get_own_issues,
 	api_get_labels,
 	RepoItem,
@@ -13,8 +12,8 @@ import { Octokit } from "@octokit/core";
 import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
 import { IssueItems } from "./Elements/IssueItems";
-import { Issue, TaskLabels, getIssueSortKey } from "./Issues/Issue";
-import { Feature, Task } from "./Tasks/Tasks";
+import { Issue, TaskLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
+import { Feature, Task, parseTaskNote } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
 import { parseIssuesToEmbed } from "./Issues/Issues.shared";
 import { reRenderView } from "./Utils/Utils";
@@ -41,125 +40,70 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	api_endpoint: "https://api.github.com",
 };
 
-function finishTask(this_task: string, tacc: Task[], i: number): string {
-	// may be called without open task(this_task == "")
-	if (this_task.length > 0) {
-		if (tacc[tacc.length - 1].end == 0) {
-			tacc[tacc.length - 1].end = i;
-		} else {
-			console.log("Cannot re-finish in finishTask old and new end: ", tacc[tacc.length-1].end, i )
-		}
-	} else if (tacc.length > 0) {
-		if (tacc[tacc.length - 1].end == 0) {
-			console.log("this_task is empty in finishTask()")
-		}
-	};
-	this_task = "";
-	return this_task;
-}
+/* Sample config
 
-function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: number, line: string): string {
-	if (this_task.length > 0) {
-		this_task = finishTask(this_task, tacc, i);
-	}
-	// - [ ] #task One more task #Core #Server #102 🔺 🛫 2025-02-01 ✅ 2025-01-31
-	// - [ ] #task One more task #Core #Server #102 🔼 🛫 2025-02-01
-	// - [ ] #task One more task #Core #Server #102 🔽 🛫 2025-02-01
-	// - [ ] #task One more task #Core #Server ⏫
-	// - [ ] #task One more task #Core #Server #102 🔺 🔁 every day 🛫 2025-02-01 ❌ 2025-01-31
-	// - [ ] #task One more task #Core #Server #102 ⏬ 🛫 2025-02-01
-	// - [x] #task Description comes here 🆔 uo7126 ⛔ t3ls4p ⏫ ➕ 2025-02-03 ⏳ 2025-01-24 📅 2025-02-07
+```github-issues
+io-swiss/io-niesen
+IO-XPA Releases
+#task
+#hidden
+#App/io-ax4
+#Core
+#Server
+#User
+```
 
-	const prios = "⏬🔽 🔼⏫🔺";		// prio0 .. prio5, prio2 = normal doesnot happen
-	const dates = "➕⏳📅🛫✅❌🔁";
-	const links = "⛔🆔";
-	
-	const task_pos = line.indexOf("#task");
-	const title_pos = task_pos + 6;
-	const words: string[] = line.substring(title_pos).split(" ");
+*/
 
-	let mapped_labels: Label[] = [];
-	mapped_labels.push({
-		name: this_feature,
-		color: "#AAAAAA"
-	} as Label);
-	
-	let titles: string[] = [];
-	let done = false;
-	
-	words.forEach((word) => {
-		if (done == false) {
-			let prio = prios.indexOf(word.substring(0, 1));
-			if (prio > 3) {
-				mapped_labels.push({
-					name: "p_critical",
-					color: "#D93F0B"
-				} as Label);
-				done = true;
-			} else if (prio > 2) {
-				mapped_labels.push({
-					name: "p_high",
-					color: "#E99695"
-				} as Label);
-				done = true;
-			} else if (prio > 0) {
-				mapped_labels.push({
-					name: "p_low",
-					color: "#9CE8C6"
-				} as Label);
-				done = true;
-			} else if (prio == 0) {
-				mapped_labels.push({
-					name: "p_backlog",
-					color: "#49EE25"
-				} as Label);
-				done = true;
-			}
-			if (dates.contains(word)) {
-				done = true;
-			} else if (links.contains(word)) {
-				done = true;
-			} else if (word.startsWith("#")) {
-				mapped_labels.push({
-					name: word,
-					color: "#FFFFFF"
-				} as Label);
-			} else {
-				titles.push(word);
+/**
+ * IssueViewParams class
+ */
+export class IssueViewParams {
+	owner: 		string;
+	repo:		string;
+	file_name: 	string;					// tasks note
+	task_token: string = "#task";		// e.g. #task
+	hidden_token: string = "#hidden";	// e.g. #hidden
+	repo_tokens: string[] = [];			// for this repo
+	other_tokens: string[] = []; 		// for other repos
+
+    constructor(source: string[]) {
+        this.owner = source[0].split("/")[0];
+        this.repo  = source[0].split("/")[1].trim();
+        this.file_name = "";
+        // this.task_token = "#task";
+        // this.hidden_token = "#hidden";
+        // this.repo_tokens = [];
+		// this.other_tokens = [];
+
+		if (source.length > 1) { 
+			console.log("File name: ", source[1]);
+			this.file_name = source[1].trim()
+		};
+		if (source.length > 2) { 
+			console.log("Task token: ", source[2]);
+			this.task_token = source[2].trim()
+		};
+		if (source.length > 3) { 
+			console.log("Hidden token: ", source[3]);
+			this.hidden_token = source[3].trim()
+		};
+		if (source.length > 4) {
+			for (let i = 4; i < source.length; i++) {
+				const words = source[i].trim().split("/");
+				if ((words.length > 1) && (words[1] == this.repo)) {
+					console.log("Repo token: ", source[i]);
+					this.repo_tokens.push(words[0].trim());
+				} else if (words.length == 1) {
+					console.log("Repo token: ", source[i]);
+					this.repo_tokens.push(words[0].trim());
+				} else {
+					console.log("Other token: ", source[i]);
+					this.other_tokens.push(words[0].trim())
+				}
 			}
 		}
-	})
-	this_task = titles.join(" ");
-	const tl = new TaskLabels(mapped_labels);
-	tacc.push(new Task(i, 0, this_task, tl, getIssueSortKey(this_task, tl), line.substring(task_pos - 3, task_pos - 2)));
-	return this_task;
-}
-
-
-function finishFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i: number): string {
-
-	if (facc[facc.length-1].tag == this_feature) {
-		facc[facc.length-1].end = i;
-		if (this_task.length > 0) {
-			this_task = finishTask(this_task, tacc, i);
-		}
-		facc[facc.length - 1].tasks = tacc;
-		tacc = [];
-	} else {
-		console.log("Tag not matching in finishFeature()");
 	}
-	this_feature = "";
-	return this_feature;
-}
-
-function startNewFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i: number, line: string): string {
-	if (this_feature.length > 0) {
-		this_feature = finishFeature(this_feature, this_task, facc, tacc, i);
-	}
-	const words = line.split(" ");
-	this_feature = words[1];
-	facc.push(new Feature(i, 0, this_feature, false, []));
-	return this_feature;
 }
 
 export default class MyPlugin extends Plugin {
@@ -196,15 +140,11 @@ export default class MyPlugin extends Plugin {
 		this.registerMarkdownCodeBlockProcessor(
 			"github-issues",
 			async (source, el) => {
-				const rows = source.split("\n").filter((row) => row.length > 0);
-				const repoName = rows[0].split("/")[1].split("#")[0];
-				const owner = rows[0].split("/")[0];
+				const view_params = new IssueViewParams(source.split("\n").filter((row) => row.length > 0));
 
-				//parse if the user only wants to embed a single/some issues or all of them
-				const parsedIssues = parseIssuesToEmbed(rows[0]);
 				const repo: RepoItem = {
-					owner: owner,
-					name: repoName,
+					owner: view_params.owner,
+					name: view_params.repo,
 					id: 0,
 					language: "",
 					updated_at: "",
@@ -213,22 +153,16 @@ export default class MyPlugin extends Plugin {
 				if (this.settings.show_searchbar) {
 					const searchfield = el.createEl("input");
 					searchfield.setAttribute("type", "text");
-					searchfield.setAttribute(
-						"placeholder",
-						"Search Titles, Labels,...",
-					);
+					searchfield.setAttribute("placeholder", "Search Titles, Labels,...",);
 					searchfield.classList.add("issues-searchfield");
 
 					searchfield.addEventListener("input", () => {
-						//go through the children of "el" and hide all that don't match the search if the search is empty show all
+						// go through the children of "el" and hide all that don't match the search 
+						// if the search is empty show all
 						const search = searchfield.value.toLowerCase();
 						el.childNodes.forEach((child) => {
 							if (child instanceof HTMLElement) {
-								if (
-									child.innerText
-										.toLowerCase()
-										.includes(search)
-								) {
+								if (child.innerText.toLowerCase().includes(search)) {
 									child.style.display = "flex";
 								} else if (child !== searchfield) {
 									child.style.display = "none";
@@ -238,69 +172,20 @@ export default class MyPlugin extends Plugin {
 					});
 				}
 
-				const allLabelsPromise: Promise<TaskLabels> = api_get_labels(this.octokit, repo);
+				const allLabelsPromise: Promise<TaskLabels> = api_get_labels(this.octokit, view_params);
 
-				let issues: Issue[] = [];
-				if (parsedIssues.length != 0) {
-					issues = await api_get_issues_by_id(
-						this.octokit,
-						repo,
-						parsedIssues,
-					);
-				} else {
-					issues = await api_get_own_issues(this.octokit, repo);
-				}
+				let issues: Issue[] = await api_get_own_issues(this.octokit, view_params);
 
-				issues = issues.sort((s1, s2) => {
-					if (s1.sort_string > s2.sort_string) {
-						return 1;
-					}
-					if (s1.sort_string < s2.sort_string) {
-						return -1;
-					}
-					return 0;
-				})
-				var this_feature = "";
-				var this_task = "";
-				var facc: Feature[] = [];
-				var tacc: Task[] = [];
+				sortIssues(issues, IssueSortOrder.feature);
+
+				let editor: Editor;
+				let facc: Feature[] = [];
 				this.app.workspace.iterateRootLeaves((leaf) => {
 					if ((leaf.getDisplayText() == "IO-XPA Releases") && (leaf.getViewState().type == "markdown")) {
 						this.app.workspace.setActiveLeaf(leaf, { focus: false });
-						if (leaf.view) {
-							
-							const editor = leaf.view.editor;
-							console.log("EditorLineCount: ", editor.lineCount());
-							for (let i = 0; i < editor.lineCount(); i++) {
-								let line = editor.getLine(i);
-								if (this_feature == "") { // look for a new feature
-									if ((line.indexOf("#hidden") == -1) && (line.startsWith("### #"))) {
-										this_feature = startNewFeature(this_feature, this_task, facc, tacc, i, line);
-										this_task = "";
-										tacc = [];
-									}	// ignore tasks and arbitrary lines without task heading
-								} else { // look for the end of the last feature
-									if ((line.indexOf("#hidden") == -1) && (line.startsWith("### #"))) { // new feature
-										this_feature = startNewFeature(this_feature, this_task, facc, tacc, i, line);
-										this_task = "";
-										tacc = [];
-									} else if (line.startsWith("####")) {
-										// skip headings of levels 4,5 and 6. May belong to features or tasks
-									} else if (line.startsWith("#")) {
-										this_feature = finishFeature(this_feature, this_task, facc, tacc, i);
-										this_task = "";
-									} else if ((line.indexOf("#task") > 3) && (line.contains("- ["))) {
-										this_task = startNewTask(this_feature, this_task, tacc, i, line); // but finish this_task first if needed
-									} 
-								}
-							}
-							if (this_feature.length > 0) {
-								this_feature = finishFeature(this_feature, this_task, facc, tacc, editor.lineCount());
-								this_task = "";
-							}
-							console.log(facc);
-
-							/// push missing labels here!
+						if (leaf.view) {							
+							editor = leaf.view.editor;		// compiler sees a problem here but it works
+							facc = parseTaskNote(editor, view_params);
 						}
 					}
 				})
@@ -315,14 +200,10 @@ export default class MyPlugin extends Plugin {
 
 					const missing_labels = new Set<string>();
 					facc.forEach((feature) => {
-						feature.tasks.forEach((task) => {
-							task.task_labels.feature_labels.forEach((label) => {
-								if (!repo_labels.has(label.name)) {
-									missing_labels.add(label.name);
-								}
-							}
-						)}
-					)});
+						if (!repo_labels.has(feature.tag)) {
+								missing_labels.add(feature.tag);						
+						}
+					});
 
 					console.log("Missing Labels in GitHub: ", missing_labels);
 
@@ -345,25 +226,12 @@ export default class MyPlugin extends Plugin {
 				}
 
 				issues.forEach((issue) => {
-					switch (this.settings.issue_appearance) {
-						case IssueAppearance.DEFAULT:
-							IssueItems.createDefaultIssueElement(
-								el,
-								issue,
-								this.octokit,
-								this.app,
-							);
-							break;
-						case IssueAppearance.COMPACT:
-							IssueItems.createCompactIssueElement(
-								el,
-								issue,
-								this.octokit,
-								this.app,
-							);
-							break;
-					}
-				});
+					IssueItems.createDefaultIssueElement(
+						el,
+						issue,
+						this.octokit,
+						this.app,
+					)});
 			},
 		);
 

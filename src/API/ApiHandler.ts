@@ -3,6 +3,7 @@ import { TaskLabels, Issue, getIssueSortKey } from "../Issues/Issue";
 import { parseRepoUrl } from "../Utils/Utils";
 import { OctokitResponse } from "@octokit/types";
 import { Notice } from "obsidian";
+import { IssueViewParams } from "../main";
 
 
 /**
@@ -75,11 +76,11 @@ export async function api_create_new_label(octokit: Octokit, repo: RepoItem | nu
  * @param octokit
  * @param repo
  */
-export async function api_get_labels(octokit: Octokit, repo: RepoItem): Promise<TaskLabels> {
+export async function api_get_labels(octokit: Octokit, view_params: IssueViewParams): Promise<TaskLabels> {
 
 	const res = await octokit.request('GET /repos/{owner}/{repo}/labels', {
-		owner: repo.owner,
-		repo: repo.name,
+		owner: view_params.owner,
+		repo: view_params.repo,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
 		}
@@ -92,9 +93,9 @@ export async function api_get_labels(octokit: Octokit, repo: RepoItem): Promise<
 				color: label.color
 			} as Label;
 		});
-		return new TaskLabels(mapped_labels);
+		return new TaskLabels(mapped_labels, view_params);
 	} else {
-		return new TaskLabels([])
+		return new TaskLabels([],view_params)
 	}
 }
 
@@ -129,16 +130,8 @@ export async function api_submit_issue(octokit: Octokit, repo: RepoItem | null, 
  * @param octokit
  * @param url
  */
-export async function api_get_issues_by_url(octokit: Octokit, url: string): Promise<Issue[]> {
-
+export async function api_get_issues_by_url(octokit: Octokit, url: string, view_params: IssueViewParams ): Promise<Issue[]> {
 	const { owner, repo } = parseRepoUrl(url);
-	const repoItem: RepoItem = {
-		owner: owner,
-		name: repo,
-		id: 0,
-		language: "",
-		updated_at: "",
-	};
 	const issues: Issue[] = [];
 	console.debug("api_get_issues_by_url");
 	try {
@@ -158,7 +151,7 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string): Prom
 						color: label.color
 					} as Label;
 				})
-				const tl = new TaskLabels(mapped_labels);
+				const tl = new TaskLabels(mapped_labels, view_params);
 		
 				issues.push(new Issue(
 					issue.title,
@@ -167,8 +160,7 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string): Prom
 					issue.number,
 					issue.created_at,
 					tl,
-					getIssueSortKey(issue.title, tl),
-					repoItem
+					view_params
 				));
 			}
 
@@ -190,12 +182,12 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string): Prom
  * @param octokit
  * @param repo
  */
-export async function api_get_own_issues(octokit: Octokit, repo: RepoItem): Promise<Issue[]> {
+export async function api_get_own_issues(octokit: Octokit, view_params: IssueViewParams): Promise<Issue[]> {
 	const issues: Issue[] = [];
 	console.debug("api_get_own_issues");
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues', {
-		owner: repo.owner,
-		repo: repo.name,
+		owner: view_params.owner,
+		repo: view_params.repo,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
 		}
@@ -209,7 +201,7 @@ export async function api_get_own_issues(octokit: Octokit, repo: RepoItem): Prom
 				color: label.color
 				} as Label;
 			})
-			const tl = new TaskLabels(mapped_labels);
+			const tl = new TaskLabels(mapped_labels, view_params);
 		
 			issues.push(new Issue(
 				issue.title,
@@ -218,8 +210,7 @@ export async function api_get_own_issues(octokit: Octokit, repo: RepoItem): Prom
 				issue.number,
 				issue.created_at,
 				tl,
-				getIssueSortKey(issue.title, tl),
-				repo
+				view_params
 			));
 		}
 
@@ -229,18 +220,18 @@ export async function api_get_own_issues(octokit: Octokit, repo: RepoItem): Prom
 	}
 }
 
-export async function api_get_issues_by_id(octokit: Octokit, repo: RepoItem, issueIDs: number[]): Promise<Issue[]> {
-	const iss = await api_get_own_issues(octokit, repo);
+export async function api_get_issues_by_id(octokit: Octokit, view_params: IssueViewParams, issueIDs: number[]): Promise<Issue[]> {
+	const iss = await api_get_own_issues(octokit, view_params);
 	//filter the issues to only include the specified ones
 	return iss.filter(issue => issueIDs.includes(issue.number));
 }
 
 export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
-	if (issue.repo == null) return;
+	if (issue.view_params.repo == null) return;
 
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}', {
-		owner: issue.repo?.owner,
-		repo: issue.repo?.name,
+		owner: issue.view_params.owner,
+		repo: issue.view_params.repo,
 		issue_number: issue.number,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
@@ -273,10 +264,10 @@ export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
 }
 
 export async function api_comment_on_issue(octokit: Octokit, issue: Issue, comment: string) {
-	if (issue.repo == null) return;
+	if (issue.view_params.repo == null) return;
 	const res = await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-		owner: issue.repo?.owner,
-		repo: issue.repo?.name,
+		owner: issue.view_params.owner,
+		repo: issue.view_params.repo,
 		issue_number: issue.number,
 		body: comment,
 		headers: {
@@ -288,10 +279,10 @@ export async function api_comment_on_issue(octokit: Octokit, issue: Issue, comme
 }
 
 export async function api_set_labels_on_issue(octokit: Octokit, issue: Issue, labels: string[]) {
-	if (issue.repo == null) return;
+	if (issue.view_params.repo == null) return;
 	const res = await octokit.request('PUT /repos/{owner}/{repo}/issues/{issue_number}/labels', {
-		owner: issue.repo?.owner,
-		repo: issue.repo?.name,
+		owner: issue.view_params.owner,
+		repo: issue.view_params.repo,
 		issue_number: issue.number,
 		labels: labels,
 		headers: {
@@ -309,11 +300,11 @@ export async function api_set_labels_on_issue(octokit: Octokit, issue: Issue, la
  * @param toBeUpdated
  */
 export async function api_update_issue(octokit: Octokit, issue: Issue, toBeUpdated: unknown) {
-	if (issue.repo == null) return;
+	if (issue.view_params.repo == null) return;
 
 	const options = {
-		owner: issue.repo?.owner,
-		repo: issue.repo?.name,
+		owner: issue.view_params.owner,
+		repo: issue.view_params.repo,
 		issue_number: issue.number,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
@@ -328,10 +319,10 @@ export async function api_update_issue(octokit: Octokit, issue: Issue, toBeUpdat
 }
 
 export async function api_get_issue_comments(octokit: Octokit, issue: Issue) {
-	if (issue.repo == null) return;
+	if (issue.view_params.repo == null) return;
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-		owner: issue.repo?.owner,
-		repo: issue.repo?.name,
+		owner: issue.view_params.owner,
+		repo: issue.view_params.repo,
 		issue_number: issue.number,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'

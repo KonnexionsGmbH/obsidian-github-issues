@@ -4,6 +4,7 @@ import { verifyURL } from "../Utils/Utils";
 import { pasteRepoName } from "./Issues.shared";
 import { Octokit } from "@octokit/core";
 import { CSVIssue } from "./Issue";
+import { IssueViewParams } from "src/main";
 
 /**
  * Fetches issues from the given url and updates them in the current editor
@@ -90,12 +91,12 @@ export async function softUpdateIssues(app: App, octokit: Octokit) {
 		if (line === "```") {
 			break;
 		}
-		local_issues.push(new CSVIssue(line, {} as RepoItem));
+		local_issues.push(new CSVIssue(line, {} as IssueViewParams));
 	}
 
 	// console.log("Local issues: " + local_issues.map(issue => issue.title).join(", "));
 
-	const issues = await fetchIssues(octokit, url);
+	const issues: CSVIssue[] = []; // await fetchIssues(octokit, url, view_params);
 
 	// console.log("Remote issues: " + issues!.map(issue => issue.title).join(", "));
 
@@ -156,8 +157,8 @@ function checkEditor(view: MarkdownView | null, repo: FileRepo | null) {
  * @param octokit
  * @param url
  */
-async function fetchIssues(octokit: Octokit, url: string) {
-	const issues = await api_get_issues_by_url(octokit, url);
+async function fetchIssues(octokit: Octokit, url: string, view_params: IssueViewParams) {
+	const issues = await api_get_issues_by_url(octokit, url, view_params);
 	if (issues.length === 0) {
 		return null;
 	}

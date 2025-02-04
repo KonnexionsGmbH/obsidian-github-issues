@@ -39,10 +39,10 @@ export class NewIssueModal extends Modal {
 			contentEl.appendChild(spinner);
 			//get the labels
 			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-			const labels = (
+			const task_labels = (
 				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				await api_get_labels(this.ocotoBundle.octokit, repo()!)
-			).map((label) => label.name);
+			);
 
 			spinner.remove();
 			//title input field
@@ -70,10 +70,10 @@ export class NewIssueModal extends Modal {
 				text: "Select Labels",
 			});
 
-			for (const label of labels) {
+			for (const label of task_labels.feature_labels) {
 				const option = labelDropdown.createEl("option");
-				option.setAttribute("value", label);
-				option.text = label;
+				option.setAttribute("value", label.name);
+				option.text = label.name;
 			}
 
 			let elements: string[] = [];
