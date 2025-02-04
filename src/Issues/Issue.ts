@@ -9,6 +9,13 @@ export enum IssueSortOrder {
   }
 
 /**
+ * return a sortable id token from issue number
+*/
+export function getLabelFromId(id: number): Label {
+	return {name: "#"+ ("000000" + id).slice(-6), color: "ffffff"} as Label;
+}
+
+/**
  * TaskLabels class
  */
 export class TaskLabels {
@@ -35,7 +42,7 @@ export class TaskLabels {
 			return 0;
 		});
 		if (id !== undefined) {
-			sorted_labels.push({ name: "#"+id, color: "ffffff" } as Label);
+			sorted_labels.push(getLabelFromId(id));
 		} 
 
 		sorted_labels.forEach((label) => {
@@ -70,14 +77,16 @@ export class Issue {
 	description: string;
 	author: string | undefined;
 	created_at: string;
+	assignee: string;
 	task_labels: TaskLabels;
     view_params: IssueViewParams;
 	sort_string: string = "";
 
-	constructor(t: string, d: string, a: string, n: number, created_at: string, task_labels: TaskLabels, view_params: IssueViewParams) {
+	constructor(t: string, d: string, a: string, n: number, created_at: string, ass: string, task_labels: TaskLabels, view_params: IssueViewParams) {
 		this.title = t;
 		this.description = d;
 		this.author = a;
+		this.assignee = ass;
 		this.number = n;
 		this.created_at = created_at;
         this.view_params = view_params;
@@ -158,13 +167,25 @@ export function sortIssues(issues: Issue[], sort_order: IssueSortOrder) {
 		issue.sort_string = getIssueSortKey(issue.title, issue.task_labels, sort_order);
 	});
 
-	issues = issues.sort((i1, i2) => {
-		if (i1.sort_string > i2.sort_string) {
-			return 1;
-		}
-		if (i1.sort_string < i2.sort_string) {
-			return -1;
-		}
-		return 0;
-	});
+	if (sort_order == IssueSortOrder.idDesc) {
+		issues = issues.sort((i1, i2) => {
+			if (i1.sort_string > i2.sort_string) {
+				return -1;
+			}
+			if (i1.sort_string < i2.sort_string) {
+				return 1;
+			}
+			return 0;
+		});
+	} else {
+		issues = issues.sort((i1, i2) => {
+			if (i1.sort_string > i2.sort_string) {
+				return 1;
+			}
+			if (i1.sort_string < i2.sort_string) {
+				return -1;
+			}
+			return 0;
+		});
+	}
 }

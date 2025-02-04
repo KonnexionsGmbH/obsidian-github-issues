@@ -49,20 +49,20 @@ export class NewIssueModal extends Modal {
 			const titleInput = contentEl.createEl("input");
 			titleInput.setAttribute("type", "text");
 			titleInput.setAttribute("placeholder", "Title");
-			titleInput.classList.add("new-issues-modal-titleInput");
+			titleInput.classList.add("new-issue-title-input");
 			//description input field
 			const descriptionInput = contentEl.createEl("textarea");
 			descriptionInput.setAttribute("type", "text");
 			descriptionInput.setAttribute("placeholder", "Description");
-			descriptionInput.classList.add("new-issues-modal-descriptionInput");
+			descriptionInput.classList.add("new-issue-description-input");
 
 			//selected labels field
 			const selectedLabels = contentEl.createEl("div");
-			selectedLabels.classList.add("new-issues-modal-selectedLabels");
+			selectedLabels.classList.add("new-issue-selected-labels");
 
 			//dropdown where you can select multiple labels
 			const labelDropdown = contentEl.createEl("select");
-			labelDropdown.classList.add("new-issues-modal-labelDropdown");
+			labelDropdown.classList.add("new-issue-label-dropdown");
 
 			//add the labels to the dropdown
 			labelDropdown.createEl("option", {
@@ -83,11 +83,11 @@ export class NewIssueModal extends Modal {
 				const value = labelDropdown.value;
 				labelDropdown.value = "Select Labels";
 				const tag = selectedLabels.createEl("div");
-				tag.classList.add("new-issues-modal-tag");
+				tag.classList.add("new-issue-tag");
 				//create button to remove the tag
 				tag.createEl("span", { text: value });
 				const removeButton = tag.createEl("button");
-				removeButton.classList.add("new-issues-modal-removeButton");
+				removeButton.classList.add("new-issue-remove-button");
 				setIcon(removeButton, "x");
 
 				removeButton.onclick = () => {

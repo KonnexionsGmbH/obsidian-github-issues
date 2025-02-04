@@ -154,7 +154,7 @@ export default class MyPlugin extends Plugin {
 					const searchfield = el.createEl("input");
 					searchfield.setAttribute("type", "text");
 					searchfield.setAttribute("placeholder", "Search Titles, Labels,...",);
-					searchfield.classList.add("issues-searchfield");
+					searchfield.classList.add("main-issues-searchfield");
 
 					searchfield.addEventListener("input", () => {
 						// go through the children of "el" and hide all that don't match the search 
@@ -196,7 +196,8 @@ export default class MyPlugin extends Plugin {
 					all_labels.feature_labels.forEach((label) => {
 						repo_labels.add(label.name);
 					});
-					console.log("Labels in GitHub: ", repo_labels);
+
+					//console.log("Labels in GitHub: ", repo_labels);
 
 					const missing_labels = new Set<string>();
 					facc.forEach((feature) => {
@@ -205,7 +206,7 @@ export default class MyPlugin extends Plugin {
 						}
 					});
 
-					console.log("Missing Labels in GitHub: ", missing_labels);
+					// console.log("Missing Labels in GitHub: ", missing_labels);
 
 					missing_labels.forEach(async (name) => {
 						const created = await api_create_new_label(

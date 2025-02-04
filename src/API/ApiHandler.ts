@@ -159,6 +159,7 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string, view_
 					issue.user?.login ?? "",
 					issue.number,
 					issue.created_at,
+					issue.assignee?.login ?? "",
 					tl,
 					view_params
 				));
@@ -201,14 +202,15 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 				color: label.color
 				} as Label;
 			})
-			const tl = new TaskLabels(mapped_labels, view_params);
-		
+			const tl = new TaskLabels(mapped_labels, view_params, issue.number);
+			// console.log("Assignee login: ", issue.assignee?.login);
 			issues.push(new Issue(
 				issue.title,
 				issue.body ?? "",
 				issue.user?.login ?? "",
 				issue.number,
 				issue.created_at,
+				issue.assignee?.login ?? "",
 				tl,
 				view_params
 			));

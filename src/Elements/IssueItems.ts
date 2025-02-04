@@ -21,27 +21,33 @@ export class IssueItems {
 		ocotokit: Octokit,
 		app: App,
 	) {
-		const container = el.createDiv({ cls: "issue-container" });
+		const container = el.createDiv({ cls: "issue-items-container" });
 
 		const title = container.createEl("h6", { text: issue.title });
-		title.classList.add("issue-title");
+		title.classList.add("issue-items-title");
 
-		const details = container.createDiv({ cls: "issue-details" });
-		details.classList.add("issue-details");
-		const detailsText = details.createEl("span", {
-			text: `#${issue.number} opened ${getPasteableTimeDelta(
-				issue.created_at,
-			)} by ${issue.author}`,
+		const details = container.createDiv();
+		details.classList.add("issue-items-details");
+		const creatorText = details.createEl("span", {
+			text: `#${issue.number} opened ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`
 		});
-		detailsText.classList.add("issue-details-text");
-		const labelContainer = title.createDiv({ cls: "label-container" });
+		creatorText.classList.add("issue-items-creator-text");
+
+		if (issue.assignee) {
+			const assigneeText = details.createEl("span", {
+				text: `assigned to ${issue.assignee}`
+			});
+			assigneeText.classList.add("issue-items-assignee-text")
+		};
+
+		const labelContainer = title.createDiv({ cls: "issue-items-label-container" });
 		const all_labels: Label[] = issue.task_labels.feature_labels.concat(issue.task_labels.normal_labels).concat(issue.task_labels.platform_labels);
 		all_labels.forEach((label) => {
-			const labelEl = labelContainer.createDiv({ cls: "label" });
+			const labelEl = labelContainer.createDiv({ cls: "issue-items-label" });
 			labelEl.style.backgroundColor = `#${label.color}`;
 			labelEl.style.color = getTextColor(label.color);
 			labelEl.innerText = label.name;
-			labelEl.classList.add("labelEl");
+			labelEl.classList.add("issue-items-label");
 		});
 
 		container.addEventListener("mouseenter", () => {
@@ -54,40 +60,6 @@ export class IssueItems {
 
 		container.addEventListener("click", () => {
 			this.openIssueDetailsModal(app, container, el, issue, ocotokit, 'default');
-		});
-	}
-
-	public static createCompactIssueElement(
-		el: HTMLElement,
-		issue: Issue,
-		ocotokit: Octokit,
-		app: App,
-	) {
-		const container = el.createDiv({ cls: "issue-container" });
-		container.classList.add("compact");
-
-		const text = container.createSpan({
-			text: `#${issue.number} • ${issue.title} `,
-		});
-		text.classList.add("compact");
-
-		const text2 = container.createSpan({
-			text: `Opened ${getPasteableTimeDelta(issue.created_at)} by ${issue.author
-				}`,
-		});
-
-		text2.style.opacity = "0.7";
-
-		container.addEventListener("mouseenter", () => {
-			container.style.opacity = "0.7";
-		});
-
-		container.addEventListener("mouseleave", () => {
-			container.style.opacity = "1";
-		});
-
-		container.addEventListener("click", () => {
-			this.openIssueDetailsModal(app, container, el, issue, ocotokit, 'compact');
 		});
 	}
 
@@ -123,20 +95,20 @@ export class IssueItems {
 					textSpan.textContent = `#${issue.number} • ${issue.title}`;
 				}
 			} else {
-				const titleEl = container.querySelector('.issue-title');
+				const titleEl = container.querySelector('.issue-items-title');
 				if (titleEl) {
 					titleEl.textContent = issue.title;
-					const labelContainer = titleEl.createDiv({ cls: "label-container" });
+					const labelContainer = titleEl.createDiv({ cls: "issue-items-label-container" });
 					const all_labels = issue.task_labels.feature_labels
 						.concat(issue.task_labels.normal_labels)
 						.concat(issue.task_labels.platform_labels);
 
 					all_labels.forEach((label) => {
-						const labelEl = labelContainer.createDiv({ cls: "label" });
+						const labelEl = labelContainer.createDiv({ cls: "issue-items-label" });
 						labelEl.style.backgroundColor = `#${label.color}`;
 						labelEl.style.color = getTextColor(label.color);
 						labelEl.innerText = label.name;
-						labelEl.classList.add("labelEl");
+						labelEl.classList.add("issue-items-label");
 					});
 				}
 			}

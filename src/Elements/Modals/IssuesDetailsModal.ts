@@ -31,10 +31,10 @@ export class IssuesDetailsModal extends Modal {
 		const { contentEl } = this;
 
 		const titleInput = contentEl.createEl("textarea", { text: this.issue.title });
-		titleInput.classList.add("issues-title-input");
+		titleInput.classList.add("issue-details-title-input");
 
 		const saveTitleButton = contentEl.createEl("button", { text: "Save Title" });
-		saveTitleButton.classList.add("save-button");
+		saveTitleButton.classList.add("issue-details-save-button");
 
 		this.showButtonOnInputChange(titleInput, saveTitleButton, this.issue.title);
 
@@ -62,12 +62,12 @@ export class IssuesDetailsModal extends Modal {
 		}
 
 		const createdContainer = contentEl.createDiv();
-		createdContainer.classList.add("created-container");
+		createdContainer.classList.add("issue-details-created-container");
 
 		const authorAndCreateDate = createdContainer.createSpan();
 		//author icon
 		const authorIcon = authorAndCreateDate.createEl("img");
-		authorIcon.classList.add("issues-assignee-icon")
+		authorIcon.classList.add("issue-details-assignee-icon")
 		authorIcon.src = details?.avatar_url;
 		//author login
 		const author = authorAndCreateDate.createSpan({
@@ -76,13 +76,13 @@ export class IssuesDetailsModal extends Modal {
 
 		const issueLink = createdContainer.createEl("a", { text: this.issue.view_params?.repo + ` #` + this.issue.number });
 		issueLink.setAttribute("href", "https://github.com/" + this.issue.view_params?.owner + "/" + this.issue.view_params?.repo + "/issues/" + this.issue.number);
-		issueLink.classList.add("issue-link")
+		issueLink.classList.add("issue-details-link")
 
 		if (details.assignee.login != undefined) {
 			const createdContainer = contentEl.createDiv();
 			//assignee icon
 			const assigneeIcon = createdContainer.createEl("img");
-			assigneeIcon.classList.add("issues-assignee-icon")
+			assigneeIcon.classList.add("issue-details-assignee-icon")
 			assigneeIcon.src = details?.assignee.avatar_url;
 			//asignee login
 			const assignee = createdContainer.createSpan({
@@ -91,10 +91,10 @@ export class IssuesDetailsModal extends Modal {
 		}
 
 		const stateAndLabelsContainer = contentEl.createDiv();
-		stateAndLabelsContainer.classList.add("issues-state-and-label-container")
+		stateAndLabelsContainer.classList.add("issue-details-state-and-label-container")
 
 		const statePill = stateAndLabelsContainer.createDiv();
-		statePill.classList.add("issues-state-pill")
+		statePill.classList.add("issue-details-state-pill")
 		//make it green if state is open
 		if (details?.state === "open") {
 			statePill.style.backgroundColor = "rgba(31, 118, 41, 0.5)";
@@ -103,10 +103,10 @@ export class IssuesDetailsModal extends Modal {
 		}
 
 		const state = statePill.createEl("span", { text: details?.state });
-		state.classList.add("issues-state")
+		state.classList.add("issue-details-state")
 
 		const labels = stateAndLabelsContainer.createDiv();
-		labels.classList.add("issues-labels")
+		labels.classList.add("issue-details-labels")
 
 		const mapped_labels = details.labels.map((label: any) => {
 			return {
@@ -121,15 +121,15 @@ export class IssuesDetailsModal extends Modal {
 		// eslint-disable-next-line no-unsafe-optional-chaining
 		for (const label of sorted_labels) {
 			const labelPill = labels.createDiv();
-			labelPill.classList.add("issues-label-pill")
+			labelPill.classList.add("issue-details-label-pill")
 			labelPill.style.background = "#" + label.color;
 			const labelName = labelPill.createEl("span", { text: label.name });
-			labelName.classList.add("issues-label-name")
+			labelName.classList.add("issue-details-label-name")
 			labelName.style.color = getTextColor(label.color);
 		}
 
 		const labelsGrid = contentEl.createDiv();
-		labelsGrid.classList.add("labels-grid");
+		labelsGrid.classList.add("issue-details-labels-grid");
 
 		if (this.issue.view_params != null) {
 			const allLabels = await api_get_labels(this.octokit, this.issue.view_params);
@@ -141,7 +141,7 @@ export class IssuesDetailsModal extends Modal {
 			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.platform_labels, checkboxes);
 
 			const saveLabelsButton = contentEl.createEl("button", { text: "Save Labels" });
-			saveLabelsButton.classList.add("save-button");
+			saveLabelsButton.classList.add("issue-details-save-button");
 
 			const checkForChanges = () => {
 				const currentSelections = new Set(
@@ -184,10 +184,10 @@ export class IssuesDetailsModal extends Modal {
 		}
 
 		const descriptionContainer = contentEl.createDiv();
-		descriptionContainer.classList.add("description-container");
+		descriptionContainer.classList.add("issue-details-description-container");
 
 		const previewDiv = descriptionContainer.createDiv();
-		previewDiv.classList.add("description-preview");
+		previewDiv.classList.add("issue-details-description-preview");
 
 		// Initial markdown render
 		await MarkdownRenderer.render(
@@ -204,7 +204,7 @@ export class IssuesDetailsModal extends Modal {
 		};
 
 		const descriptionInput = contentEl.createEl("textarea", { text: details.body });
-		descriptionInput.classList.add("issues-description-input");
+		descriptionInput.classList.add("issue-details-description-input");
 		descriptionInput.style.display = "none";
 
 		// Initial size adjustment
@@ -245,7 +245,7 @@ export class IssuesDetailsModal extends Modal {
 		});
 
 		const saveDescriptionButton = contentEl.createEl("button", { text: "Save Description" });
-		saveDescriptionButton.classList.add("save-button");
+		saveDescriptionButton.classList.add("issue-details-save-button");
 
 		this.showButtonOnInputChange(descriptionInput, saveDescriptionButton, details.body);
 
@@ -274,21 +274,21 @@ export class IssuesDetailsModal extends Modal {
 
 		comments.forEach(comment => {
 			const commentsContainer = contentEl.createDiv();
-			commentsContainer.classList.add("issues-comments-container")
+			commentsContainer.classList.add("issue-details-comments-container")
 
 			const authorContainer = commentsContainer.createDiv();
-			authorContainer.classList.add("issues-author-container")
+			authorContainer.classList.add("issue-details-author-container")
 
 			const authorIcon = authorContainer.createEl("img");
-			authorIcon.classList.add("issues-author-icon")
+			authorIcon.classList.add("issue-details-author-icon")
 			authorIcon.src = comment?.avatar_url;
 
 			let header_text = comment?.login + " commented " + getPasteableTimeDelta(comment?.update_at);
 			const authorName = authorContainer.createEl("span", { text: header_text });
-			authorName.classList.add("issues-author-name")
+			authorName.classList.add("issue-details-author-name")
 
 			const commentBody = commentsContainer.createDiv();
-			commentBody.classList.add("issues-comment-body")
+			commentBody.classList.add("issue-details-comment-body")
 
 			const commentText = commentBody.createEl("span");
 			MarkdownRenderer.render(
@@ -298,27 +298,27 @@ export class IssuesDetailsModal extends Modal {
 				'',
 				new Component()
 			);
-			commentText.classList.add("issues-comment-text")
+			commentText.classList.add("issue-details-comment-text")
 			commentText.classList.add("selectable-text");
 
 		});
 
 		const commentsInput = contentEl.createEl("textarea");
-		commentsInput.classList.add("issues-comments-input")
+		commentsInput.classList.add("issue-details-comments-input")
 		//set the label
 		const commentsInputLabel = contentEl.createEl("label", { text: "Write a comment" });
-		commentsInputLabel.classList.add("issues-comments-input-label")
+		commentsInputLabel.classList.add("issue-details-comments-input-label")
 		commentsInputLabel.htmlFor = commentsInput.id;
 
 
 		const buttonsContainer = contentEl.createDiv();
-		buttonsContainer.classList.add("issues-buttons-container")
+		buttonsContainer.classList.add("issue-details-buttons-container")
 
 		const commentButton = buttonsContainer.createEl("button", { text: "Comment" });
-		commentButton.classList.add("issues-comment-button")
+		commentButton.classList.add("issue-details-comment-button")
 
 		const closeButton = buttonsContainer.createEl("button", { text: "Close Issue" });
-		closeButton.classList.add("issues-close-button")
+		closeButton.classList.add("issue-details-close-button")
 
 		commentButton.onclick = async () => {
 			const updated = await api_comment_on_issue(this.octokit, this.issue, commentsInput.value);
@@ -363,16 +363,16 @@ export class IssuesDetailsModal extends Modal {
 		for (let i = 0; i < Math.floor(labels.length / 2); i++) {
 			const row = labelsGrid.createDiv();
 			if (i == 0) {
-				row.classList.add("labels-row-first");
+				row.classList.add("issue-details-labels-row-first");
 			}
 			else {
-				row.classList.add("labels-row");
+				row.classList.add("issue-details-labels-row");
 			}
 	
 			// First label
 			const labelContainer1 = row.createDiv();
 			this.appendColorCircle(labelContainer1, labels[i].color);
-			labelContainer1.classList.add("label-grid-container");
+			labelContainer1.classList.add("issue-details-label-grid-container");
 			const labelCheckbox1 = labelContainer1.createEl("input", {
 				type: "checkbox",
 				value: labels[i].name
@@ -388,7 +388,7 @@ export class IssuesDetailsModal extends Modal {
 			
 			if (n < labels.length) {
 				const labelContainer2 = row.createDiv();
-				labelContainer2.classList.add("label-grid-container");
+				labelContainer2.classList.add("issue-details-label-grid-container");
 				this.appendColorCircle(labelContainer2, labels[n].color);
 				const labelCheckbox2 = labelContainer2.createEl("input", {
 					type: "checkbox",
@@ -404,7 +404,7 @@ export class IssuesDetailsModal extends Modal {
 
 	private appendColorCircle(container: HTMLElement, color: string): void {
 		const colorCircle = container.createSpan();
-		colorCircle.classList.add("label-color-circle");
+		colorCircle.classList.add("issue-details-label-color-circle");
 		colorCircle.style.backgroundColor = `#${color}`;
 	}
 }
