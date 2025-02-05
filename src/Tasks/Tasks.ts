@@ -1,4 +1,4 @@
-import { TaskLabels, getIssueSortKey, IssueSortOrder } from "../Issues/Issue";
+import { TaskLabels, getIssueSortKey, IssueSortOrder, shortName } from "../Issues/Issue";
 import { Label } from "../API/ApiHandler";
 import { Editor } from "obsidian";
 import { IssueViewParams } from "../main";
@@ -194,4 +194,37 @@ export function parseTaskNote(editor: Editor, view_params: IssueViewParams): Fea
     }
     console.log(facc);
     return facc;
+}
+
+export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewParams): string[] {
+    let bad_task_alerts: string[] = [];
+    const id_labels = new Set<string>(); // issue ids for this repo over all features
+    facc.forEach((feature) => {
+        feature.tasks.forEach((task) => {
+            const ids:string[] = task.task_labels.id_labels.map(label => label.name);
+            const rts:string[] = [];    // repo tokens
+            const ots:string[] = [];    // other tokens
+            task.task_labels.platform_labels.map(label => label.name).forEach((n) => {
+                if (view_params.repo_tokens.some( token => token == n )) {
+                    rts.push(n);
+                } else if (view_params.other_tokens.some( token => token == n )) {
+                    ots.push(n);
+                }
+            });
+            if ((rts.length > 0) && (ots.length > 0)) {
+                bad_task_alerts.push([feature.tag, "'", task.title, "'"].concat(ids).concat(["spans multiple repos"]).join(" "));
+            }
+            if (rts.length > 0) {
+                ids.forEach((id) => {
+                    if (id_labels.has(id)){
+                        bad_task_alerts.push([feature.tag, "'", task.title,"'"].concat([shortName(id)]).concat(["conflicts with same id above"]).join(" "));
+                    } else {
+                        id_labels.add(id);
+                    }
+                });
+            }
+        })
+    })
+
+    return bad_task_alerts;
 }

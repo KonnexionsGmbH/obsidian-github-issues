@@ -117,3 +117,13 @@ export class IssueItems {
 		}
 	}
 }
+
+
+export function createBadTaskAlert(
+	el: HTMLElement,
+	bt: string) 
+{
+	const container = el.createDiv({ cls: "issue-items-container" });
+	const title = container.createEl("h6", { text: bt });
+	title.classList.add("issue-items-title");
+}

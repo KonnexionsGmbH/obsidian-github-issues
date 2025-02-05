@@ -11,9 +11,9 @@ import { IssuesModal } from "./Elements/Modals/IssuesModal";
 import { Octokit } from "@octokit/core";
 import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
-import { IssueItems } from "./Elements/IssueItems";
+import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
 import { Issue, TaskLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
-import { Feature, Task, parseTaskNote } from "./Tasks/Tasks";
+import { Feature, Task, parseTaskNote, collectBadTaskAlerts } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
 import { parseIssuesToEmbed } from "./Issues/Issues.shared";
 import { reRenderView } from "./Utils/Utils";
@@ -224,7 +224,23 @@ export default class MyPlugin extends Plugin {
 							new Notice("New label creation failed :" + name);
 						}
 					  });
-				}
+
+					  const bad_tasks_alerts: string[] = collectBadTaskAlerts(facc, view_params);
+
+					  console.log("bad_tasks_alerts: ", bad_tasks_alerts);
+
+					  bad_tasks_alerts.forEach((bt) => {
+						createBadTaskAlert(el, bt);
+					  });
+
+					  if (bad_tasks_alerts.length > 0) {
+						const bt = `The synchronisation between Obsidian and GitHub has been aborted because of above mentioned consistency errors in ${view_params.file_name}.
+						Please correct those. The issue state in GitHub below may help you with that.`;
+						createBadTaskAlert(el, bt);
+					  }
+
+				};
+
 
 				issues.forEach((issue) => {
 					IssueItems.createDefaultIssueElement(

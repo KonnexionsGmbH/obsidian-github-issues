@@ -16,6 +16,15 @@ export function getLabelFromId(id: number): Label {
 }
 
 /**
+ * return a short id token from a long (sortable) one
+*/
+export function shortName(name:string): string {
+	let id:number = +name.substring(1);
+	return "#"+ id;
+}
+
+
+/**
  * TaskLabels class
  */
 export class TaskLabels {
@@ -111,9 +120,10 @@ export class CSVIssue extends Issue {
 			} as Label
 		});
 		const tl = new TaskLabels(mapped_labels, view_params);
-        super(issue_title, "", issue_author, issue_number, issue_created_at, tl, view_params);
+        super(issue_title, "", issue_author, issue_number, issue_created_at, "", tl, view_params);
     }
 }
+
 
 /*
  * Constructs a string which can be used to sort issues by features then issue title then platforms
