@@ -12,7 +12,6 @@ import {
 	api_set_labels_on_issue,
 	Label
 } from "../../API/ApiHandler";
-import { updateIssues } from "../../Issues/IssueUpdater";
 import { getTextColor } from "../../Utils/Color.utils";
 
 /**
