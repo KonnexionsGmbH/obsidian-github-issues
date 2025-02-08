@@ -1,4 +1,4 @@
-import { Issue } from "../Issues/Issue";
+import { Issue, allProperLabels } from "../Issues/Issue";
 import { getPasteableTimeDelta } from "../Utils/Utils";
 import { IssuesDetailsModal } from "./Modals/IssuesDetailsModal";
 import { App } from "obsidian";
@@ -43,8 +43,8 @@ export class IssueItems {
 		}
 
 		const labelContainer = title.createDiv({ cls: "issue-items-label-container" });
-		const all_labels: Label[] = issue.task_labels.feature_labels.concat(issue.task_labels.normal_labels).concat(issue.task_labels.platform_labels);
-		all_labels.forEach((label) => {
+
+		allProperLabels(issue.cls).forEach((label) => {
 			const labelEl = labelContainer.createDiv({ cls: "issue-items-label" });
 			labelEl.style.backgroundColor = `#${label.color}`;
 			labelEl.style.color = getTextColor(label.color);
@@ -101,11 +101,8 @@ export class IssueItems {
 				if (titleEl) {
 					titleEl.textContent = issue.title;
 					const labelContainer = titleEl.createDiv({ cls: "issue-items-label-container" });
-					const all_labels = issue.task_labels.feature_labels
-						.concat(issue.task_labels.normal_labels)
-						.concat(issue.task_labels.platform_labels);
 
-					all_labels.forEach((label) => {
+					allProperLabels(issue.cls).forEach((label) => {
 						const labelEl = labelContainer.createDiv({ cls: "issue-items-label" });
 						labelEl.style.backgroundColor = `#${label.color}`;
 						labelEl.style.color = getTextColor(label.color);

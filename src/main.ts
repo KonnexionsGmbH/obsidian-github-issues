@@ -3,8 +3,8 @@ import {
 	api_authenticate,
 	api_get_own_issues,
 	api_get_labels,
-	RepoItem,
 	Label,
+	RepoItem,
 	api_create_new_label
 } from "./API/ApiHandler";
 import { IssuesModal } from "./Elements/Modals/IssuesModal";
@@ -12,8 +12,8 @@ import { Octokit } from "@octokit/core";
 import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
 import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
-import { Issue, TaskLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
-import { Feature, Task, parseTaskNote, collectBadTaskAlerts } from "./Tasks/Tasks";
+import { Issue, ClassLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
+import { Feature, Task, parseTaskNote, collectBadTaskAlerts, issueToTaskSync } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
 import { parseIssuesToEmbed } from "./Issues/Issues.shared";
 import { reRenderView } from "./Utils/Utils";
@@ -40,8 +40,19 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	api_endpoint: "https://api.github.com",
 };
 
-/* Sample config
+/**
+ * IssueViewParams class
+ */
+export class IssueViewParams {
+	owner: 			string;				// organisation owning the repo
+	repo:			string;				// repository name
+	file_name: 		string;				// tasks note (#ReleasesNote)
+	task_token: 	string = "#task";	// e.g. #task from Tasks plugin config
+	hidden_token:	string = "#hidden";	// e.g. #hidden used for features
+	product_tokens: string[] = [];		// for products in this repo
+	foreign_tokens: string[] = []; 		// for products in other repos
 
+/* Sample config
 ```github-issues
 io-swiss/io-niesen
 IO-XPA Releases
@@ -52,29 +63,11 @@ IO-XPA Releases
 #Server
 #User
 ```
-
 */
-
-/**
- * IssueViewParams class
- */
-export class IssueViewParams {
-	owner: 		string;
-	repo:		string;
-	file_name: 	string;					// tasks note
-	task_token: string = "#task";		// e.g. #task
-	hidden_token: string = "#hidden";	// e.g. #hidden
-	repo_tokens: string[] = [];			// for this repo
-	other_tokens: string[] = []; 		// for other repos
-
     constructor(source: string[]) {
         this.owner = source[0].split("/")[0];
         this.repo  = source[0].split("/")[1].trim();
         this.file_name = "";
-        // this.task_token = "#task";
-        // this.hidden_token = "#hidden";
-        // this.repo_tokens = [];
-		// this.other_tokens = [];
 
 		if (source.length > 1) { 
 			console.log("File name: ", source[1]);
@@ -93,13 +86,13 @@ export class IssueViewParams {
 				const words = source[i].trim().split("/");
 				if ((words.length > 1) && (words[1] == this.repo)) {
 					console.log("Repo token: ", source[i]);
-					this.repo_tokens.push(words[0].trim());
+					this.product_tokens.push(words[0].trim());
 				} else if (words.length == 1) {
 					console.log("Repo token: ", source[i]);
-					this.repo_tokens.push(words[0].trim());
+					this.product_tokens.push(words[0].trim());
 				} else {
 					console.log("Other token: ", source[i]);
-					this.other_tokens.push(words[0].trim())
+					this.foreign_tokens.push(words[0].trim())
 				}
 			}
 		}
@@ -142,14 +135,6 @@ export default class MyPlugin extends Plugin {
 			async (source, el) => {
 				const view_params = new IssueViewParams(source.split("\n").filter((row) => row.length > 0));
 
-				const repo: RepoItem = {
-					owner: view_params.owner,
-					name: view_params.repo,
-					id: 0,
-					language: "",
-					updated_at: "",
-				};
-
 				if (this.settings.show_searchbar) {
 					const searchfield = el.createEl("input");
 					searchfield.setAttribute("type", "text");
@@ -172,7 +157,7 @@ export default class MyPlugin extends Plugin {
 					});
 				}
 
-				const allLabelsPromise: Promise<TaskLabels> = api_get_labels(this.octokit, view_params);
+				const allRepoLabelsPromise: Promise<ClassLabels> = api_get_labels(this.octokit, view_params);
 
 				let issues: Issue[] = await api_get_own_issues(this.octokit, view_params);
 
@@ -190,10 +175,10 @@ export default class MyPlugin extends Plugin {
 					}
 				})
 
-				let all_labels: TaskLabels = await allLabelsPromise;
+				let repo_class_labels: ClassLabels = await allRepoLabelsPromise;
 				if (facc.length > 0)  {
 					const repo_labels = new Set<string>();
-					all_labels.feature_labels.forEach((label) => {
+					repo_class_labels.feature_labels.forEach((label) => {
 						repo_labels.add(label.name);
 					});
 
@@ -211,11 +196,11 @@ export default class MyPlugin extends Plugin {
 					missing_labels.forEach(async (name) => {
 						const created = await api_create_new_label(
 							this.octokit,
-							repo,
+							view_params,
 							name
 						);		
 						if (created) {
-							all_labels.feature_labels.push({
+							repo_class_labels.feature_labels.push({
 								name: name,
 								color: "aaaaaa"
 							} as Label);
@@ -223,24 +208,25 @@ export default class MyPlugin extends Plugin {
 						} else {
 							new Notice("New label creation failed :" + name);
 						}
-					  });
+					});
 
-					  const bad_tasks_alerts: string[] = collectBadTaskAlerts(facc, view_params);
+					const [bad_tasks_alerts, idns] = collectBadTaskAlerts(facc, view_params);
 
-					  console.log("bad_tasks_alerts: ", bad_tasks_alerts);
+					console.log("bad_tasks_alerts: ", bad_tasks_alerts);
 
-					  bad_tasks_alerts.forEach((bt) => {
+					if (bad_tasks_alerts.length > 0) {
+
+						const bt = `The synchronisation between Obsidian and GitHub has been aborted because of below mentioned consistency errors in ${view_params.file_name}.
+						Please correct those. The GitHub Issues list which follows may help you with that.`;
 						createBadTaskAlert(el, bt);
-					  });
+						bad_tasks_alerts.forEach((bt) => createBadTaskAlert(el, bt) );
 
-					  if (bad_tasks_alerts.length > 0) {
-						const bt = `The synchronisation between Obsidian and GitHub has been aborted because of above mentioned consistency errors in ${view_params.file_name}.
-						Please correct those. The issue state in GitHub below may help you with that.`;
-						createBadTaskAlert(el, bt);
-					  }
+					} else {				
 
+						issues.forEach((issue) => issueToTaskSync(issue, view_params, editor, facc, idns));
+		
+					}
 				};
-
 
 				issues.forEach((issue) => {
 					IssueItems.createDefaultIssueElement(

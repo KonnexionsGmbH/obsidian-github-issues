@@ -1,5 +1,5 @@
 import { App, Component, MarkdownRenderer, Modal, Notice } from "obsidian";
-import { TaskLabels, Issue } from "../../Issues/Issue";
+import { ClassLabels, Issue, allProperLabels} from "../../Issues/Issue";
 import { Octokit } from "@octokit/core";
 import { getPasteableTimeDelta, reRenderView } from "../../Utils/Utils";
 import { loadingSpinner } from "../../Utils/Loader";
@@ -44,7 +44,6 @@ export class IssuesDetailsModal extends Modal {
 			if (updated) {
 				new Notice("Issue Title updated");
 				saveTitleButton.classList.remove("visible");
-				// this.close();
 			} else {
 				new Notice("Could not update issue");
 			}
@@ -113,12 +112,11 @@ export class IssuesDetailsModal extends Modal {
 				color: label.color
 			} as Label;
 		})
-		const tl = new TaskLabels(mapped_labels, this.issue.view_params);
-		const sorted_labels: Label[] = tl.feature_labels.concat(tl.normal_labels).concat(tl.platform_labels);
-
+		const tl = new ClassLabels(mapped_labels, this.issue.view_params);
+		
 		//loop through the labels
 		// eslint-disable-next-line no-unsafe-optional-chaining
-		for (const label of sorted_labels) {
+		for (const label of allProperLabels(tl)) {
 			const labelPill = labels.createDiv();
 			labelPill.classList.add("issue-details-label-pill")
 			labelPill.style.background = "#" + label.color;
@@ -136,8 +134,10 @@ export class IssuesDetailsModal extends Modal {
 			const checkboxes: HTMLInputElement[] = [];
 
 			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.feature_labels, checkboxes);
-			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.normal_labels, checkboxes);
-			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.platform_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.priority_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.other_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.foreign_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.product_labels, checkboxes);
 
 			const saveLabelsButton = contentEl.createEl("button", { text: "Save Labels" });
 			saveLabelsButton.classList.add("issue-details-save-button");
@@ -165,12 +165,16 @@ export class IssuesDetailsModal extends Modal {
 			});
 
 			saveLabelsButton.onclick = async () => {
-				const labels = [...allLabels.feature_labels, ...allLabels.normal_labels, ...allLabels.platform_labels];
+				const labels = [...allLabels.feature_labels, 
+								...allLabels.priority_labels,
+								...allLabels.other_labels,
+								...allLabels.foreign_labels,
+								...allLabels.product_labels];
 				const selectedLabels = Array.from(labelsGrid.querySelectorAll("input:checked")).map((checkbox: HTMLInputElement) => checkbox.value);
 				const updated = await api_set_labels_on_issue(this.octokit, this.issue, selectedLabels);
 				if (updated) {
 					new Notice("Labels updated");
-					this.issue.task_labels = new TaskLabels(
+					this.issue.cls = new ClassLabels(
 						selectedLabels.map(label => { return { name: label, color: labels.find(l => l.name == label)?.color } as Label; })
 						, this.issue.view_params
 						, this.issue.number);

@@ -1,4 +1,4 @@
-import { Label, RepoItem} from "../API/ApiHandler";
+import { Label } from "../API/ApiHandler";
 import { IssueViewParams} from "../main";
 
 export enum IssueSortOrder {
@@ -23,22 +23,34 @@ export function shortName(name:string): string {
 	return "#"+ id;
 }
 
+/**
+ * return a long id token from short or long one
+*/
+export function longName(name:string): string {
+	let id:number = +name.substring(1);
+	return "#"+ ("000000" + id).slice(-6);
+}
+
 
 /**
- * TaskLabels class
+ * ClassLabels class
  */
-export class TaskLabels {
+export class ClassLabels {
 	feature_labels: Label[];
-	normal_labels: Label[];
-	platform_labels: Label[];
+	product_labels: Label[];
+	foreign_labels: Label[];
+	priority_labels: Label[];
+	other_labels: Label[];
 	id_labels: Label[];
 
 	constructor(mapped_labels: Label[], view_params: IssueViewParams, id?: number) {
-		const rts: string[] = view_params.repo_tokens;
-		const ots: string[] = view_params.other_tokens;
+		const pts: string[] = view_params.product_tokens;
+		const fts: string[] = view_params.foreign_tokens;
 		this.feature_labels = [];
-		this.normal_labels = [];
-		this.platform_labels = [];
+		this.product_labels = [];
+		this.foreign_labels = [];
+		this.priority_labels = [];
+		this.other_labels = [];
 		this.id_labels = [];
 
 		const sorted_labels = mapped_labels.sort((l1,l2) => {
@@ -55,11 +67,11 @@ export class TaskLabels {
 		} 
 
 		sorted_labels.forEach((label) => {
-			if (rts.some( token => token == label.name )) {
-				this.platform_labels.push(label);
+			if (pts.some( token => token == label.name )) {
+				this.product_labels.push(label);
 			}
-			else if (ots.some( token => token == label.name )) {
-				this.platform_labels.push(label);
+			else if (fts.some( token => token == label.name )) {
+				this.foreign_labels.push(label);
 			}
 			else if (label.name.search(/#/) == 0) {
 				if (isNaN(+label.name.substring(1))) {
@@ -68,13 +80,23 @@ export class TaskLabels {
 				else {
 					this.id_labels.push(label);
 				}
-			}
-			else {
-				this.normal_labels.push(label)
+			} else if ( label.name.startsWith("p_") ) {
+				this.priority_labels.push(label)
+			} else {
+				this.other_labels.push(label)
 			}
 		})
-
 	}
+}
+
+export function allProperLabels(cls: ClassLabels): Label[] {
+	// notincluding id_labels
+	return 	cls.feature_labels.concat(
+			cls.priority_labels).concat(
+			cls.other_labels).concat(
+			cls.foreign_labels).concat(
+			cls.product_labels);
+
 }
 
 /**
@@ -87,11 +109,12 @@ export class Issue {
 	author: string | undefined;
 	created_at: string;
 	assignee: string;
-	task_labels: TaskLabels;
+	cls: ClassLabels;
     view_params: IssueViewParams;
 	sort_string: string = "";
+	findings: string[] = [];
 
-	constructor(t: string, d: string, a: string, n: number, created_at: string, ass: string, task_labels: TaskLabels, view_params: IssueViewParams) {
+	constructor(t: string, d: string, a: string, n: number, created_at: string, ass: string, cls: ClassLabels, view_params: IssueViewParams) {
 		this.title = t;
 		this.description = d;
 		this.author = a;
@@ -99,7 +122,7 @@ export class Issue {
 		this.number = n;
 		this.created_at = created_at;
         this.view_params = view_params;
-		this.task_labels = task_labels;
+		this.cls = cls;
 	}
 }
 
@@ -119,16 +142,16 @@ export class CSVIssue extends Issue {
 				color: label.split('#')[1]
 			} as Label
 		});
-		const tl = new TaskLabels(mapped_labels, view_params);
+		const tl = new ClassLabels(mapped_labels, view_params);
         super(issue_title, "", issue_author, issue_number, issue_created_at, "", tl, view_params);
     }
 }
 
 
 /*
- * Constructs a string which can be used to sort issues by features then issue title then platforms
+ * Constructs a string which can be used to sort issues by features then issue title then products
  */
-export function getIssueSortKey(title: string, tl: TaskLabels, sort_order: IssueSortOrder ): string {
+export function issueSortKey(title: string, tl: ClassLabels, sort_order: IssueSortOrder ): string {
 	const res: string[] = [];
 	switch  (sort_order) {
 		case IssueSortOrder.feature: {
@@ -136,7 +159,7 @@ export function getIssueSortKey(title: string, tl: TaskLabels, sort_order: Issue
 					res.push(label.name);
 			});
 			res.push(title);
-			tl.platform_labels.forEach((label) => {
+			tl.product_labels.forEach((label) => {
 				res.push(label.name);
 			});
 			tl.id_labels.forEach((label) => {
@@ -149,7 +172,7 @@ export function getIssueSortKey(title: string, tl: TaskLabels, sort_order: Issue
 			tl.feature_labels.forEach((label) => {
 				res.push(label.name);
 			});
-			tl.platform_labels.forEach((label) => {
+			tl.product_labels.forEach((label) => {
 				res.push(label.name);
 			});
 			tl.id_labels.forEach((label) => {
@@ -174,7 +197,8 @@ export function getIssueSortKey(title: string, tl: TaskLabels, sort_order: Issue
 
 export function sortIssues(issues: Issue[], sort_order: IssueSortOrder) {
 	issues.forEach((issue) => {
-		issue.sort_string = getIssueSortKey(issue.title, issue.task_labels, sort_order);
+		issue.sort_string = issueSortKey(issue.title, issue.cls, sort_order);
+		// console.log("issue_sort_string: ", issue.sort_string);
 	});
 
 	if (sort_order == IssueSortOrder.idDesc) {

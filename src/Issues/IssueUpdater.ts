@@ -1,5 +1,5 @@
 import { App, Editor, MarkdownView, Notice } from "obsidian";
-import { api_get_issues_by_url, RepoItem } from "../API/ApiHandler";
+import { api_get_issues_by_url } from "../API/ApiHandler";
 import { verifyURL } from "../Utils/Utils";
 import { pasteRepoName } from "./Issues.shared";
 import { Octokit } from "@octokit/core";
@@ -11,17 +11,20 @@ import { IssueViewParams } from "src/main";
  * @param app
  */
 export async function updateIssues(app: App) {
-	let repo = getRepoInFile(app);
+
+	//get the view parameters (owner and repo) from the current file
+	const view_params = getViewParamsInFile(this.app);
+
 	let view = app.workspace.getActiveViewOfType(MarkdownView)
 
-	if (!checkEditor(view, repo)) return;
+	if (!checkEditor(view, view_params)) return;
 	// I know that this is stupid, but it gets asserted in the checkEditor function so it's fine...probably
 	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-	repo = repo!;
+	// repo = repo!;
 	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 	view = view!;
 	const editor = view.editor;
-	const url = "https://github.com/" + repo.name + "/" + repo.repo + ".git";
+	const url = "https://github.com/" + view_params.owner + "/" + view_params.repo + ".git";
 
 	//verify the url
 	if (!verifyURL(url)) {
@@ -29,7 +32,7 @@ export async function updateIssues(app: App) {
 		return;
 	}
 
-	insertIssues(editor, repo, view, url);
+	insertIssues(editor, view_params, view, url);
 }
 
 /**
@@ -40,12 +43,12 @@ export async function updateIssues(app: App) {
  * @param url
  * @private
  */
-function insertIssues(editor: Editor, repo: FileRepo, view: MarkdownView | null, url: string) {
-	// 	//delete the lines between the start and end line
-	editor.replaceRange("", { line: repo.start_line, ch: 0 }, { line: repo.end_line + 2, ch: 0 });
+function insertIssues(editor: Editor, view_params: IssueViewParams, view: MarkdownView | null, url: string) {
+	//delete the lines between the start and end line
+	//editor.replaceRange("", { line: repo.start_line, ch: 0 }, { line: repo.end_line + 2, ch: 0 });
 
-	//set the cursor to the start line
-	editor.setCursor({ line: repo.start_line, ch: 0 });
+	// set the cursor to the start line
+	//editor.setCursor({ line: repo.start_line, ch: 0 });
 
 	//insert the issues
 	const pasted = pasteRepoName(view, url);
@@ -57,6 +60,7 @@ function insertIssues(editor: Editor, repo: FileRepo, view: MarkdownView | null,
 }
 
 let lastUpdate: Date | null = null;
+
 export async function softUpdateIssues(app: App, octokit: Octokit) {
 	//check if the last update was more than 15 sec ago to prevent spamming the api
 	if (lastUpdate && (new Date().getTime() - lastUpdate.getTime()) < 15000) {
@@ -66,17 +70,19 @@ export async function softUpdateIssues(app: App, octokit: Octokit) {
 
 	// new Notice("Update triggered on " + new Date().toLocaleTimeString())
 
-	let repo = getRepoInFile(app);
-	let view = app.workspace.getActiveViewOfType(MarkdownView)
+	//get the view parameters (owner and repo) from the current file
+	const view_params = getViewParamsInFile(this.app);
 
-	if (!checkEditor(view, repo)) return;
+	let view = app.workspace.getActiveViewOfType(MarkdownView);
+
+	if (!checkEditor(view, view_params)) return;
 	// I know that this is stupid, but it gets asserted in the checkEditor function so it's fine...probably
 	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-	repo = repo!;
+	// repo = repo!;
 	// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-	view = view!;
+	// view = view!;
 	const editor = view.editor;
-	const url = "https://github.com/" + repo.name + "/" + repo.repo + ".git";
+	const url = "https://github.com/" + view_params.owner + "/" + view_params.repo + ".git";
 
 	//verify the url
 	if (!verifyURL(url)) {
@@ -86,6 +92,7 @@ export async function softUpdateIssues(app: App, octokit: Octokit) {
 
 	//get the local issues by parsing the second line after the ```github-issues until the line with ```
 	const local_issues: CSVIssue[] = [];
+/*
 	for (let i = repo.start_line + 2; i < repo.end_line; i++) {
 		const line = editor.getLine(i);
 		if (line === "```") {
@@ -93,7 +100,7 @@ export async function softUpdateIssues(app: App, octokit: Octokit) {
 		}
 		local_issues.push(new CSVIssue(line, {} as IssueViewParams));
 	}
-
+*/
 	// console.log("Local issues: " + local_issues.map(issue => issue.title).join(", "));
 
 	const issues: CSVIssue[] = []; // await fetchIssues(octokit, url, view_params);
@@ -120,7 +127,7 @@ export async function softUpdateIssues(app: App, octokit: Octokit) {
 			new Notice("No Issue updates found")
 			return;
 		} else {
-			insertIssues(editor, repo, view, url);
+			insertIssues(editor, view_params, view, url);
 		}
 	}
 	//update the last update time
@@ -133,7 +140,7 @@ export async function softUpdateIssues(app: App, octokit: Octokit) {
  * @param view
  * @param repo
  */
-function checkEditor(view: MarkdownView | null, repo: FileRepo | null) {
+function checkEditor(view: MarkdownView | null, view_params: IssueViewParams | null) {
 	if (!view) {
 		new Notice("No active view");
 		return false;
@@ -144,7 +151,7 @@ function checkEditor(view: MarkdownView | null, repo: FileRepo | null) {
 		return false;
 	}
 
-	if (!repo) {
+	if (!view_params) {
 		new Notice("No repo found in file");
 		return false;
 	}
@@ -170,88 +177,31 @@ async function fetchIssues(octokit: Octokit, url: string, view_params: IssueView
  * This is very hacky and should be replaced with a better solution
  * @param app
  */
-export function getRepoInFile(app: App) {
+export function getViewParamsInFile(app: App): IssueViewParams {
 	//get the current editor
-	let start_line = 0;
-	let end_line = 0;
-	let org_name = "";
-	let repo_name = "";
-	let file_name = "";
-	let task_token = "";
-	let hidden_token = "";
-	let platforms: string[] = [];
+	let start_line = -1;
+	let end_line = -1;
+	let source = "";
 	const view = app.workspace.getActiveViewOfType(MarkdownView)
 	if (view) {
 		const editor = view.editor;
-
 		//loop trough the document and print every line
 		for (let i = 0; i < editor.lineCount(); i++) {
 			const line = editor.getLine(i);
 			// console.log(line);
 			if (line.includes("```github-issues")) {
 				start_line = i;
-				console.log("start_line:", start_line);
+				// console.log("start_line:", start_line);
 			}
 			else if (line.includes("```")) {
 				end_line = i;
-				console.log("end_line:", end_line);
+				// console.log("end_line:", end_line);
 			}
-			else if ((start_line>0) || (i == start_line + 1)) {
-				//parse the name and the repo from the first line
-				// const start_line_text = editor.getLine(start_line + 1);
-				const name_and_repo_split = line.split("/");
-				const org_name = name_and_repo_split[0];
-				const repo = name_and_repo_split[1];
-				console.log("name:", org_name);
-				console.log("repo:", repo);
+			else if ((start_line > -1) || (end_line == -1)) {
+				console.log("line: ", line);
+				source = source + line + "\n";
 			}
-			else if ((start_line>0) || (i == start_line + 2)) {
-				// this is the file name of the note containing local tasks
-				file_name = line.trim();
-				console.log("file_name:", file_name);
-			}
-			else if ((start_line>0) || (i == start_line + 3)) {
-				// this is the task tag (maybe "#task") used to identify task lines
-				task_token = line.trim();
-				console.log("task_token:", task_token);
-			}
-			else if ((start_line>0) || (i == start_line + 4)) {
-				// this is the hidden tag (maybe "#hidden") used to prevent feature sync to Git 
-				hidden_token = line.trim();
-				console.log("hidden_token:", hidden_token);
-			}
-			else if ((start_line>0) || (end_line == 0)) {
-				platforms.push(line.trim());
-			}
-		}
-		console.log("platforms:", platforms);
-
-
-		if (repo_name != "") {
-			return {
-				name: org_name,
-				repo: repo_name,
-				file: file_name,
-				task: task_token,
-				hidden: hidden_token,
-				platforms: platforms,
-				start_line: start_line,
-				end_line: end_line
-			} as FileRepo
-		} else {
-			return null
 		}
 	}
-	return null;
-}
-
-interface FileRepo {
-	name: string,
-	repo: string,
-	file: string,
-	task: string,
-	hidden: string,
-	platforms: string[],
-	start_line: number,
-	end_line: number
+	return new IssueViewParams(source.split("\n").filter((row) => row.length > 0));
 }

@@ -1,6 +1,6 @@
 import { App, Modal, Notice, setIcon } from "obsidian";
 import { OctoBundle } from "../../main";
-import { getRepoInFile, updateIssues } from "../../Issues/IssueUpdater";
+import { getViewParamsInFile, updateIssues } from "../../Issues/IssueUpdater";
 import {
 	api_get_labels,
 	api_submit_issue,
@@ -20,28 +20,21 @@ export class NewIssueModal extends Modal {
 	}
 
 	async onOpen() {
-		//get the repo name from the current file
-		const repo: () => RepoItem | null = () => {
-			const repo = getRepoInFile(this.app);
-			if (!repo) return null;
-			return {
-				name: repo.repo,
-				owner: repo.name,
-			} as RepoItem;
-		};
+		//get the view parameters (owner and repo) from the current file
+		const view_params = getViewParamsInFile(this.app);
 
-		if (repo()) {
+		if (view_params) {
 			const { contentEl } = this;
 			contentEl.createEl("h2", {
-				text: "New Issue in: " + repo()?.owner + "/" + repo()?.name,
+				text: "New Issue in: " + view_params?.owner + "/" + view_params?.repo,
 			});
 			const spinner = loadingSpinner();
 			contentEl.appendChild(spinner);
 			//get the labels
 			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-			const task_labels = (
+			const cls = (
 				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-				await api_get_labels(this.ocotoBundle.octokit, repo()!)
+				await api_get_labels(this.ocotoBundle.octokit, view_params)
 			);
 
 			spinner.remove();
@@ -70,7 +63,7 @@ export class NewIssueModal extends Modal {
 				text: "Select Labels",
 			});
 
-			for (const label of task_labels.feature_labels) {
+			for (const label of cls.feature_labels) {
 				const option = labelDropdown.createEl("option");
 				option.setAttribute("value", label.name);
 				option.text = label.name;
@@ -121,7 +114,7 @@ export class NewIssueModal extends Modal {
 				// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 				const submitted = await api_submit_issue(
 					this.ocotoBundle.octokit,
-					repo(),
+					view_params,
 					{
 						labels: elements,
 						title: titleInput.value,

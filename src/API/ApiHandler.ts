@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/core";
-import { TaskLabels, Issue, getIssueSortKey } from "../Issues/Issue";
+import { ClassLabels, Issue } from "../Issues/Issue";
 import { parseRepoUrl } from "../Utils/Utils";
 import { OctokitResponse } from "@octokit/types";
 import { Notice } from "obsidian";
@@ -54,11 +54,11 @@ export async function api_get_repos(octokit: Octokit) {
  * @param octokit
  */
 
-export async function api_create_new_label(octokit: Octokit, repo: RepoItem | null, name: string) {
-	if (repo == null) return false;
+export async function api_create_new_label(octokit: Octokit, view_params: IssueViewParams | null, name: string) {
+	if (view_params == null) return false;
 	const res = await octokit.request('POST /repos/{owner}/{repo}/labels', {
-	owner: repo.owner,
-	repo: repo.name,
+	owner: view_params.owner,
+	repo: view_params.repo,
 	name: name,
 	description: 'Feature Label',
 	color: 'aaaaaa',
@@ -76,7 +76,7 @@ export async function api_create_new_label(octokit: Octokit, repo: RepoItem | nu
  * @param octokit
  * @param repo
  */
-export async function api_get_labels(octokit: Octokit, view_params: IssueViewParams): Promise<TaskLabels> {
+export async function api_get_labels(octokit: Octokit, view_params: IssueViewParams): Promise<ClassLabels> {
 
 	const res = await octokit.request('GET /repos/{owner}/{repo}/labels', {
 		owner: view_params.owner,
@@ -93,29 +93,27 @@ export async function api_get_labels(octokit: Octokit, view_params: IssueViewPar
 				color: label.color
 			} as Label;
 		});
-		return new TaskLabels(mapped_labels, view_params);
+		return new ClassLabels(mapped_labels, view_params);
 	} else {
-		return new TaskLabels([],view_params)
+		return new ClassLabels([],view_params)
 	}
 }
 
 /**
  * Submit an issue to a repo
  * @param octokit
- * @param repo
+ * @param view_params
  * @param issue
  * @returns true if the issue was submitted successfully
  */
-export async function api_submit_issue(octokit: Octokit, repo: RepoItem | null, issue: SubmittableIssue) {
-	if (repo == null) return;
+export async function api_submit_issue(octokit: Octokit, view_params: IssueViewParams, issue: SubmittableIssue) {
+
 	const res = await octokit.request('POST /repos/{owner}/{repo}/issues', {
-		owner: repo.owner,
-		repo: repo.name,
+		owner: view_params.owner,
+		repo: view_params.repo,
 		title: issue.title,
 		body: issue.description,
-		assignees: [
-			repo.owner
-		],
+		assignees: [],  // view_params.owner
 		labels: issue.labels,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
@@ -151,7 +149,7 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string, view_
 						color: label.color
 					} as Label;
 				})
-				const tl = new TaskLabels(mapped_labels, view_params);
+				const tl = new ClassLabels(mapped_labels, view_params);
 		
 				issues.push(new Issue(
 					issue.title,
@@ -202,7 +200,7 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 				color: label.color
 				} as Label;
 			})
-			const tl = new TaskLabels(mapped_labels, view_params, issue.number);
+			const tl = new ClassLabels(mapped_labels, view_params, issue.number);
 			// console.log("Assignee login: ", issue.assignee?.login);
 			issues.push(new Issue(
 				issue.title,

@@ -1,5 +1,4 @@
 import { App } from "obsidian";
-import { TaskLabels } from "../Issues/Issue";
 
 /** 
  * Re-renders the current view
