@@ -3,28 +3,6 @@ import { Label } from "../API/ApiHandler";
 import { Editor, Notice } from "obsidian";
 import { IssueViewParams } from "../main";
 
-/**
- * return a sortable id token from issue number
-*/
-export function getTokenFromIid(iid: number): string {
-	return "#"+ ("000000" + iid).slice(-6);
-}
-
-/**
- * return a short iid token from a long (sortable) one
-*/
-export function shortIidToken(token:string): string {
-	let iid:number = +token.substring(1);
-	return "#"+ iid;
-}
-
-/**
- * return a long iid token from short or long one
-*/
-export function longIidToken(token:string): string {
-	let iid:number = +token.substring(1);
-	return "#"+ ("000000" + iid).slice(-6);
-}
 
 /**
  * ClassLabels class
@@ -33,18 +11,20 @@ export class ClassTokens {
 
     feature_tokens: string[];
     product_tokens: string[];
-    iid_tokens: string[];
+    id_tokens: string[];
     foreign_tokens: string[];
     priority_tokens: string[];
     other_tokens: string[];
 
     constructor(mapped_tokens: string[], view_params: IssueViewParams, iid?: number) {
-        const prios = "⏬🔽🔼⏫🔺";		// prio0 .. prio4
+        const prios = "⏬🔽🔼⏫🔺";	// prio0 .. prio4
+        const tid_token = "🆔";		    // task ID
+
         const pts: string[] = view_params.product_tokens;
         const fts: string[] = view_params.foreign_tokens;
         this.feature_tokens = [];
         this.product_tokens = [];
-        this.iid_tokens = [];
+        this.id_tokens = [];
         this.foreign_tokens = [];
         this.priority_tokens = [];
         this.other_tokens = [];    // dates, periodicity
@@ -59,7 +39,7 @@ export class ClassTokens {
             return 0;
         });
         if (iid !== undefined) {
-            sorted_tokens.push(getTokenFromIid(iid));
+            sorted_tokens.push("#" + iid);
         } 
 
         sorted_tokens.forEach((token) => {
@@ -74,10 +54,12 @@ export class ClassTokens {
                     this.feature_tokens.push(token);
                 }
                 else {
-                    this.iid_tokens.push(token);
+                    this.id_tokens.push(token);
                 }
             } else if ( prios.indexOf(token) > -1 ) {
-                this.priority_tokens.push(token)
+                this.priority_tokens.push(token) 
+            } else if (token.startsWith(tid_token)) {
+                this.id_tokens.push(token);
             } else {
                 this.other_tokens.push(token)
             }
@@ -94,17 +76,19 @@ export class Task {
     start: number;              // line number in 'ReleasesNote'
     end:   number;              // next line after Feature or ReleasesNote.length  
     title: string;              // text without tags
+    description: string;        // optional markdown multi-line task description
     cts: ClassTokens;           // feature, product, id, priority, other (date/link) tags
     sort_string: string;
     status_code: string;        // " ": todo, "x":done, "s": assigned Sven, "S": working Sven, etc.
 
-    constructor(start: number, end: number, title: string, cts: ClassTokens, sort_string: string, status_code: string) {
+    constructor(start: number, end: number, t: string, cts: ClassTokens, sort: string, status: string) {
         this.start = start;
         this.end = end;
-        this.title = title;
+        this.title = t;
+        this.description = "";  // not in constructor because not known in time
         this.cts = cts;
-        this.sort_string = sort_string;
-        this.status_code = status_code;
+        this.sort_string = sort;
+        this.status_code = status;
     }
 }
 
@@ -156,52 +140,30 @@ function prioNameFromToken(token: string): string {
     const names = [ 'p_backlog', 'p_low', 'p_high', 'p_highest', 'p_critical' ];
     const tokens = "⏬🔽🔼⏫🔺";
     const idx = tokens.indexOf(token);
-    return names[idx];
+    if (idx > -1) {
+        return names[idx];
+    } else {
+        return "p_not_found";
+    }
 }
 
 
 /*
  * Constructs a string which can be used to sort tasks by feature, title, products, IssueId
  */
-function taskSortKey(title: string, cts: ClassTokens, sort_order: IssueSortOrder ): string {
+function taskSortKey(title: string, cts: ClassTokens ): string {
 	const res: string[] = [];
-	switch  (sort_order) {
-		case IssueSortOrder.feature: {
-			
-			res.push(cts.feature_tokens[0]);
-			res.push(title);
-			cts.product_tokens.forEach((token) => {
-				res.push(token);
-			});
-			cts.iid_tokens.forEach((token) => {
-				res.push(token);
-			});
-			break;
-		};
-		case IssueSortOrder.title: {
-			res.push(title);
-			res.push(cts.feature_tokens[0]);
-			cts.product_tokens.forEach((token) => {
-				res.push(token);
-			});
-			cts.iid_tokens.forEach((token) => {
-				res.push(token);
-			});
-			break;
-		};
-		case IssueSortOrder.idAsc: {
-			cts.iid_tokens.forEach((token) => {
-				res.push(token);
-			});
-			break;
-		};
-		case IssueSortOrder.idDesc: {
-			cts.iid_tokens.forEach((token) => {
-				res.push(token);
-			});
-		};
-	}
-	return res.join();
+		
+    res.push(cts.feature_tokens[0]);
+    res.push(title);
+    cts.product_tokens.forEach((token) => {
+        res.push(token);
+    });
+    cts.id_tokens.forEach((token) => {
+        res.push(token);
+    });
+
+    return res.join();
 }
 
 
@@ -247,14 +209,14 @@ function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: 
             // scanning for product or iid tokens or title pieces
             if (word.startsWith("#")) {
                 mapped_tokens.push(word)
-            } else {
+            } else if (word.length > 0) {
                 title_acc.push(word);
             }
         } else if (done) {
             if ( tokens.indexOf(word) > -1 ) {
                 mapped_tokens.push(token_acc.join(" "));
                 token_acc = [word];
-            } else { 
+            } else if (word.length > 0) { 
                 token_acc.push(word);
             }
         }
@@ -265,11 +227,11 @@ function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: 
     };
 
     this_task = title_acc.join(" ");
-    const tl = new ClassTokens(mapped_tokens, view_params);
+    const cts = new ClassTokens(mapped_tokens, view_params);
     
     console.log("startNewTask with mapped tokens: ", mapped_tokens);
     
-    tacc.push(new Task(i, 0, this_task, tl, taskSortKey(this_task, tl, IssueSortOrder.feature), line.substring(task_pos - 3, task_pos - 2)));
+    tacc.push(new Task(i, 0, this_task, cts, taskSortKey(this_task, cts), line.substring(task_pos - 3, task_pos - 2)));
     return [this_feature,this_task];
 }
 
@@ -334,10 +296,10 @@ export function parseTaskNote(editor: Editor, view_params: IssueViewParams): Fea
 
 export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewParams): [string[], Set<string>] {
     const bad_task_alerts: string[] = [];
-    const idns = new Set<string>();     // issue ids (long/sortable format) for this repo over all features
+    const idns = new Set<string>();     // issue ids for this repo over all features
     facc.forEach((feature) => {
         feature.tasks.forEach((task) => {
-            const iids:string[] = task.cts.iid_tokens;
+            const iids:string[] = task.cts.id_tokens;
             const pts:string[] = [];    // product_tokens
             const fts:string[] = [];    // foreign_tokens
             task.cts.product_tokens.forEach((n) => {
@@ -348,13 +310,12 @@ export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewPara
                 }
             });
             if ((pts.length > 0) && (fts.length > 0)) {
-                const short_iids = iids.map(iid => shortIidToken(iid));
-                bad_task_alerts.push([feature.tag, "'", task.title, "'"].concat(short_iids).concat(["spans multiple repos"]).join(" "));
+                bad_task_alerts.push([feature.tag, "'", task.title, "'"].concat(iids).concat(["spans multiple repos"]).join(" "));
             }
             if (pts.length > 0) {
                 iids.forEach((iid) => {
                     if (idns.has(iid)){
-                        bad_task_alerts.push([feature.tag, "'", task.title,"'"].concat([shortIidToken(iid)]).concat(["conflicts with same id above"]).join(" "));
+                        bad_task_alerts.push([feature.tag, "'", task.title,"'"].concat(iid).concat(["conflicts with same id above"]).join(" "));
                     } else {
                         idns.add(iid);
                     }
@@ -372,9 +333,9 @@ function renderTask(task: Task, view_params: IssueViewParams): string {
 
     const res = [header, task.title].concat(
             task.cts.product_tokens).concat(
-            task.cts.iid_tokens.map(iid => shortIidToken(iid))).concat(
+            task.cts.id_tokens).concat(     
             task.cts.priority_tokens).concat(
-            task.cts.other_tokens).join(" ");
+            task.cts.other_tokens).join(" ");        // .map(iid => shortIidToken(iid))
 
     console.log("renderTask: ", res);
 
@@ -395,8 +356,8 @@ function statusCodeFromAssignee( assignee: string ): string {
 }
 
 export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], idns: Set<string>) {
-    
-    if ((issue.cls.feature_labels.length == 1) && (issue.cls.id_labels.length == 1)  && (issue.cls.priority_labels.length <= 1)) {
+    const tid_token = "🆔";	
+    if ((issue.cls.feature_labels.length == 1) && (issue.cls.id_labels.length >= 1)  && (issue.cls.priority_labels.length <= 1)) {
         let findings: string[] = [];
         // issue has one feature and one product label, maybe we can sync it with tasks
         const i_feature = issue.cls.feature_labels[0].name; // issue has a feature label
@@ -407,22 +368,31 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
             for (let f = 0; f < facc.length; f++) {
                 if (facc[f].tag == i_feature) {   // search for task under correct feature only
                     for (let t = 0; t < facc[f].tasks.length; t++) {
-                        if (facc[f].tasks[t].cts.iid_tokens.length > 0) {
-                            // task has an iid token
-                            if (facc[f].tasks[t].cts.iid_tokens[0] == i_id) {   // task found
-                                t_task = facc[f].tasks[t];
-                                t_found = true;
-                                if (t_task.title != issue.title) {
-                                    findings.push('Task title does not match the Issue title.')
-                                };
-                                if (t_task.status_code != issue.assignee) {
-                                    findings.push('Task status code does not match issue assignee.')
-                                };
-                                if (t_task.cts.product_tokens != issue.cls.product_labels.map(label => label.name)) {
-                                    findings.push('Task products do not match issue products.');
-                                };
-                                break;                    
-                            }
+                        if (facc[f].tasks[t].cts.id_tokens.some(token => token == i_id)) {
+                            // task has the i_id token
+                            t_task = facc[f].tasks[t];
+                            t_found = true;
+                            if (t_task.cts.id_tokens.length < 2) {
+                                findings.push('Task does not have a task ID.');
+                            } else if (issue.description.contains(t_task.cts.id_tokens[1])) {
+                                // match, nothing to do
+                            } else if (issue.description.contains(tid_token)) {
+                                findings.push('Task ID does not match link in issue description.');
+                            } else { 
+                                issue.description = "synced to task " + t_task.cts.id_tokens[1] + issue.description;
+                                findings.push("Task ID link added to issue description.");
+                            };
+
+                            if (t_task.title != issue.title) {
+                                findings.push('Task title does not match the issue title.');
+                            };
+                            if (t_task.status_code.toLowerCase() != issue.assignee.charAt(0).toLowerCase()) {
+                                findings.push(`Task status code ${t_task.status_code} does not match issue assignee.`);
+                            };
+                            if (t_task.cts.product_tokens != issue.cls.product_labels.map(label => label.name)) {
+                                findings.push("Task product tags don't match issue product labels.");
+                            };
+                            break;                    
                         }
                     }
                     if (!t_found) {
@@ -433,7 +403,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                 }
             }
             if (findings.length > 0) {
-                new Notice(`Syncing Issue ${shortIidToken(i_id)} to Tasks had ${findings.length} findings.`);
+                new Notice(`Syncing issue ${i_id} to tasks had ${findings.length} findings.`);
                 issue.findings = findings;
             }
         } else {  
@@ -488,12 +458,12 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                 issue.cls.id_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
                 issue.cls.priority_labels.forEach(label => prioTokenFromLabel(label));
                 const cts = new ClassTokens(mapped_tokens, view_params, issue.number); 
-                const sort_string = taskSortKey(issue.title, cts, IssueSortOrder.feature);
+                const sort_string = taskSortKey(issue.title, cts);
                 const new_task = new Task(t_start, t_start+1, issue.title, cts, sort_string, status_code);
                 editor.setCursor({ line: t_start, ch: 0 });
                 editor.replaceSelection(renderTask(new_task, view_params) + "\n");
-                new Notice("Inserting new Task from Issue #" + issue.number);
-                console.log("Inserting new Task from Issue #" + issue.number);
+                new Notice("Inserting new task from issue #" + issue.number);
+                console.log("Inserting new task from issue #" + issue.number);
                 facc[f_inserted].tasks.splice(t_inserted, 0, new_task);
                 for (let f = 0; f < facc.length; f++) {
                     if (f == f_inserted) {
@@ -516,8 +486,6 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
         }
     } else if (issue.cls.feature_labels.length > 1) {
         issue.findings.push('Issue cannot have more than one feature label');
-    } else if (issue.cls.id_labels.length > 1) {
-        issue.findings.push('Issue cannot have more than one id label');
     } else if (issue.cls.priority_labels.length >= 1) {
         issue.findings.push('Issue cannot have more than one priority label');
     }

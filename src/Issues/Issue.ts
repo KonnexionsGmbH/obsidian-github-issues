@@ -2,10 +2,10 @@ import { Label } from "../API/ApiHandler";
 import { IssueViewParams} from "../main";
 
 export enum IssueSortOrder {
-	feature = "Feature, Title, Labels, Id",
-	title = "Title, Feature, Labels, Id",
-	idDesc = "Id desc",
-	idAsc = "Id asc"
+	feature = "Feature, Title, Product Labels, Ids",
+	title = "Title, Feature, Product Labels, Ids",
+	idDesc = "Ids desc",
+	idAsc = "Ids asc"
   }
 
 /**
@@ -43,7 +43,8 @@ export class ClassLabels {
 	other_labels: Label[];
 	id_labels: Label[];
 
-	constructor(mapped_labels: Label[], view_params: IssueViewParams, id?: number) {
+	constructor(mapped_labels: Label[], view_params: IssueViewParams, iid?: number) {
+		const tid_token = "🆔";  // task id token
 		const pts: string[] = view_params.product_tokens;
 		const fts: string[] = view_params.foreign_tokens;
 		this.feature_labels = [];
@@ -62,8 +63,8 @@ export class ClassLabels {
 			}
 			return 0;
 		});
-		if (id !== undefined) {
-			sorted_labels.push(getLabelFromId(id));
+		if (iid !== undefined) {
+			sorted_labels.push(getLabelFromId(iid));
 		} 
 
 		sorted_labels.forEach((label) => {
@@ -82,6 +83,8 @@ export class ClassLabels {
 				}
 			} else if ( label.name.startsWith("p_") ) {
 				this.priority_labels.push(label)
+			} else if (label.name == tid_token) {
+				this.priority_labels.push(label);
 			} else {
 				this.other_labels.push(label)
 			}
@@ -155,9 +158,9 @@ export function issueSortKey(title: string, tl: ClassLabels, sort_order: IssueSo
 	const res: string[] = [];
 	switch  (sort_order) {
 		case IssueSortOrder.feature: {
-			tl.feature_labels.forEach((label) => {
-					res.push(label.name);
-			});
+			if (tl.feature_labels.length > 0) {
+				res.push(tl.feature_labels[0].name);
+			};
 			res.push(title);
 			tl.product_labels.forEach((label) => {
 				res.push(label.name);
