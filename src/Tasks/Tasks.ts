@@ -42,7 +42,7 @@ export class ClassTokens {
             sorted_tokens.push("#" + iid);
         } 
 
-        sorted_tokens.forEach((token) => {
+        sorted_tokens.filter(t => t.length > 0).forEach((token) => {
             if (pts.some( pts_token => token == pts_token )) {
                 this.product_tokens.push(token);
             }
@@ -159,6 +159,9 @@ function taskSortKey(title: string, cts: ClassTokens ): string {
     cts.product_tokens.forEach((token) => {
         res.push(token);
     });
+    cts.foreign_tokens.forEach((token) => {
+        res.push(token);
+    });
     cts.id_tokens.forEach((token) => {
         res.push(token);
     });
@@ -166,6 +169,22 @@ function taskSortKey(title: string, cts: ClassTokens ): string {
     return res.join();
 }
 
+function pushTaskDescription(this_feature: string, this_task:string, tacc: Task[], line:string) {
+    if (this_task.length > 0) {
+        tacc[tacc.length-1].description += "\n".concat(line);
+    }
+}
+
+
+function cleanTaskDescription( d: string): string {
+    // trims and removes task description empty lines at the end 
+    const desc = d.split("\n").map(w => w.trim()).filter(line => line != "").join("\n");
+    if (desc == "") {
+        return ""
+    } else {
+        return "\n" + desc;
+    }
+}
 
 function finishTask(this_feature: string, this_task: string, tacc: Task[], i: number): [string,string] {
     // may be called without open task(this_task == "")
@@ -189,7 +208,7 @@ function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: 
         [this_feature, this_task] = finishTask(this_feature, this_task, tacc, i);
     }
 
-    const tokens = "⏬🔽🔼⏫🔺➕⏳📅🛫✅❌🔁⛔🆔";
+    const task_tokens = "⏬🔽🔼⏫🔺➕⏳📅🛫✅❌🔁⛔🆔";
     
     const task_pos = line.indexOf("#task");
     const title_pos = task_pos + 6;
@@ -201,8 +220,8 @@ function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: 
     let title_acc: string[] = [];
     let done = false;   // done with title and product/iid tokens, rest are other tokens
     let token_acc: string[] = [];
-    words.forEach((word) => {
-        if ( !done && ( tokens.indexOf(word) > -1 )) {
+    words.filter(w => w.length > 0).forEach((word) => {
+        if ( !done && ( task_tokens.indexOf(word) > -1 )) {
             done = true;
             token_acc = [word];
         } else if ( !done ) {
@@ -213,7 +232,7 @@ function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: 
                 title_acc.push(word);
             }
         } else if (done) {
-            if ( tokens.indexOf(word) > -1 ) {
+            if ( task_tokens.indexOf(word) > -1 ) {
                 mapped_tokens.push(token_acc.join(" "));
                 token_acc = [word];
             } else if (word.length > 0) { 
@@ -228,13 +247,10 @@ function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: 
 
     this_task = title_acc.join(" ");
     const cts = new ClassTokens(mapped_tokens, view_params);
-    
-    console.log("startNewTask with mapped tokens: ", mapped_tokens);
-    
+       
     tacc.push(new Task(i, 0, this_task, cts, taskSortKey(this_task, cts), line.substring(task_pos - 3, task_pos - 2)));
     return [this_feature,this_task];
 }
-
 
 function finishFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i: number): [string,string] {
 
@@ -280,18 +296,67 @@ export function parseTaskNote(editor: Editor, view_params: IssueViewParams): Fea
                 tacc = [];
             } else if (line.startsWith("####")) {
                 // skip headings of levels 4,5 and 6. May belong to features or tasks
+                pushTaskDescription(this_feature, this_task, tacc, line);
             } else if (line.startsWith("#")) {
                 [this_feature, this_task] = finishFeature(this_feature, this_task, facc, tacc, i);
             } else if ((line.indexOf("#task") > 3) && (line.contains("- ["))) {
                 [this_feature, this_task] = startNewTask(this_feature, this_task, tacc, i, line, view_params); // but finish this_task first if needed
-            } 
+            } else {
+                pushTaskDescription(this_feature, this_task, tacc, line);
+            }
         }
     }
     if (this_feature.length > 0) {
         [this_feature, this_task] = finishFeature(this_feature, this_task, facc, tacc, editor.lineCount());
     }
+    // console.log(facc);
+    let compression = 0;
+    for (let f = 0; f < facc.length; f++) {
+        if ((!facc[f].hidden) && (facc[f].tasks.length > 0)) {
+            // sort tasks within this feature and remove empty lines
+            let acc = "";
+            let r_start = facc[f].tasks[0].start + compression; // tasks to be sorted start here
+            let r_end = facc[f].end + compression;     // replace text up to the end of the task
+            let idx = r_start;  // start index for next task
+            facc[f].start += compression;
+            facc[f].tasks.sort((t1, t2) => {
+                if (t1.sort_string > t2.sort_string) {
+                    return 1;
+                }
+                if (t1.sort_string < t2.sort_string) {
+                    return -1;
+                }
+                return 0;
+            });
+            for (let t = 0; t < facc[f].tasks.length; t++) {
+                // loop through sorted tasks
+                // trim descriptions and correct line numbers
+                // accumulate replacement text
+                facc[f].tasks[t].start = idx;
+                let new_desc = cleanTaskDescription(facc[f].tasks[t].description);
+                if (t == facc[f].tasks.length -1) {
+                    facc[f].tasks[t].description = new_desc;
+                } else if (facc[f].tasks[t+1].title != facc[f].tasks[t].title) {
+                    facc[f].tasks[t].description = new_desc + "\n";
+                };
+                facc[f].tasks[t].end = idx + facc[f].tasks[t].description.split("\n").length;
+                idx = facc[f].tasks[t].end;
+                acc = acc + renderTask(facc[f].tasks[t], view_params) + facc[f].tasks[t].description + "\n";
+            };
+            compression = compression + idx - r_end; // correct feature.end and following features with this
+            // console.log("New compression: ", compression);
+            facc[f].end += compression;
+            // console.log(acc);
+            editor.replaceRange(acc, {line: r_start, ch: 0}, {line: r_end, ch: 0});
+        }
+    }
     console.log(facc);
     return facc;
+}
+
+export function sortTaskNote(facc: Feature[], view_params: IssueViewParams, editor: Editor) {
+
+
 }
 
 export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewParams): [string[], Set<string>] {
@@ -302,6 +367,9 @@ export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewPara
             const iids:string[] = task.cts.id_tokens;
             const pts:string[] = [];    // product_tokens
             const fts:string[] = [];    // foreign_tokens
+            if (task.title.split(/[⏬🔽🔼⏫🔺➕⏳📅🛫✅❌🔁⛔🆔]/).length > 1) {
+                bad_task_alerts.push([feature.tag, "'", task.title, "'"].concat(["contains task token(s). Add spacing."]).join(" "));
+            };
             task.cts.product_tokens.forEach((n) => {
                 if (view_params.product_tokens.some( token => token == n )) {
                     pts.push(n);
@@ -312,15 +380,22 @@ export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewPara
             if ((pts.length > 0) && (fts.length > 0)) {
                 bad_task_alerts.push([feature.tag, "'", task.title, "'"].concat(iids).concat(["spans multiple repos"]).join(" "));
             }
-            if (pts.length > 0) {
-                iids.forEach((iid) => {
-                    if (idns.has(iid)){
-                        bad_task_alerts.push([feature.tag, "'", task.title,"'"].concat(iid).concat(["conflicts with same id above"]).join(" "));
-                    } else {
-                        idns.add(iid);
+            iids.forEach((iid) => {
+                if (iid.startsWith("#")) {
+                    if (pts.length > 0) {
+                        // only consider other iids for same repo
+                        if (idns.has(iid)) {
+                            bad_task_alerts.push([feature.tag, "'", task.title,"'"].concat(iid).concat(["conflicts with same id above"]).join(" "));
+                        } else {
+                            idns.add(iid);
+                        }
                     }
-                });
-            }
+                } else if (idns.has(iid)) {
+                    bad_task_alerts.push([feature.tag, "'", task.title,"'"].concat(iid).concat(["conflicts with same id above"]).join(" "));
+                } else {
+                    idns.add(iid);
+                }
+            });
         })
     })
     console.log("All ID Set: " , idns);
@@ -333,11 +408,12 @@ function renderTask(task: Task, view_params: IssueViewParams): string {
 
     const res = [header, task.title].concat(
             task.cts.product_tokens).concat(
+            task.cts.foreign_tokens).concat(
             task.cts.id_tokens).concat(     
             task.cts.priority_tokens).concat(
             task.cts.other_tokens).join(" ");        // .map(iid => shortIidToken(iid))
 
-    console.log("renderTask: ", res);
+    // console.log("renderTask: ", res);
 
     return res;
 }
@@ -357,9 +433,12 @@ function statusCodeFromAssignee( assignee: string ): string {
 
 export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], idns: Set<string>) {
     const tid_token = "🆔";	
-    if ((issue.cls.feature_labels.length == 1) && (issue.cls.id_labels.length >= 1)  && (issue.cls.priority_labels.length <= 1)) {
+    if ((issue.cls.feature_labels.length == 1) && 
+         (issue.cls.id_labels.length >= 1)  &&
+          (issue.cls.product_labels.length >= 1) && 
+           (issue.cls.priority_labels.length <= 1)) {
         let findings: string[] = [];
-        // issue has one feature and one product label, maybe we can sync it with tasks
+        // issue has one feature and at least one product label, maybe we can sync it with tasks
         const i_feature = issue.cls.feature_labels[0].name; // issue has a feature label
         const i_id = issue.cls.id_labels[0].name;           // issue's id (long format)
         let t_task: Task;
@@ -409,9 +488,9 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
         } else {  
             // no task with this id exists, we assume that it was created on GitHub and
             // insert it into the ReleasesNote under its feature (if that exists there)
-            let f_inserted = -1;    // point to feature where task is inserted
-            let t_inserted = -1;    // point to task where it is inserted
-            let t_start = -1;       // editor line number where task is inserted
+            let f_inserted = -1;    // point to feature where task is to be inserted
+            let t_inserted = -1;    // point to task where it is to be inserted
+            let t_start = -1;       // editor line number where task is to be inserted
             for (let f = 0; f < facc.length; f++) {
                 if (facc[f].tag == i_feature) {   
                     // feature found
@@ -456,8 +535,9 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                 issue.cls.feature_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
                 issue.cls.product_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
                 issue.cls.id_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
-                issue.cls.priority_labels.forEach(label => prioTokenFromLabel(label));
-                const cts = new ClassTokens(mapped_tokens, view_params, issue.number); 
+                issue.cls.priority_labels.forEach(label => mapped_tokens.push(prioTokenFromLabel(label)));
+                // console.log("Inserting Issue with these mapped_tokens: ", mapped_tokens);
+                const cts = new ClassTokens(mapped_tokens, view_params); 
                 const sort_string = taskSortKey(issue.title, cts);
                 const new_task = new Task(t_start, t_start+1, issue.title, cts, sort_string, status_code);
                 editor.setCursor({ line: t_start, ch: 0 });
@@ -482,7 +562,15 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                         facc[f].end += 1;
                     }
                 }
-            }            
+            }
+            
+            if (issue.cls.foreign_labels.length > 0) {
+                // check if we need to insert a task for a foreign repo
+                // we don't have an issue idfor that and must search for
+                // title and foreign product token
+
+                // tbd
+            }
         }
     } else if (issue.cls.feature_labels.length > 1) {
         issue.findings.push('Issue cannot have more than one feature label');

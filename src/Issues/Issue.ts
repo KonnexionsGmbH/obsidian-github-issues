@@ -2,26 +2,11 @@ import { Label } from "../API/ApiHandler";
 import { IssueViewParams} from "../main";
 
 export enum IssueSortOrder {
-	feature = "Feature, Title, Product Labels, Ids",
-	title = "Title, Feature, Product Labels, Ids",
-	idDesc = "Ids desc",
-	idAsc = "Ids asc"
+	feature = "Feature, Title, ...",
+	title = "Title, Feature, ...",
+	idDesc = "Issue ID desc",
+	idAsc = "Issue ID asc"
   }
-
-/**
- * return a sortable id token from issue number
-*/
-export function getLabelFromId(id: number): Label {
-	return {name: "#"+ ("000000" + id).slice(-6), color: "ffffff"} as Label;
-}
-
-/**
- * return a short id token from a long (sortable) one
-*/
-export function shortName(name:string): string {
-	let id:number = +name.substring(1);
-	return "#"+ id;
-}
 
 /**
  * return a long id token from short or long one
@@ -64,7 +49,7 @@ export class ClassLabels {
 			return 0;
 		});
 		if (iid !== undefined) {
-			sorted_labels.push(getLabelFromId(iid));
+			sorted_labels.push({name: "#" + iid, color: "ffffff"} as Label);
 		} 
 
 		sorted_labels.forEach((label) => {
@@ -185,14 +170,19 @@ export function issueSortKey(title: string, tl: ClassLabels, sort_order: IssueSo
 		};
 		case IssueSortOrder.idAsc: {
 			tl.id_labels.forEach((label) => {
-				res.push(label.name);
+				if (label.name.startsWith("#")) {
+					res.push(longName(label.name));
+				}
 			});
 			break;
 		};
 		case IssueSortOrder.idDesc: {
 			tl.id_labels.forEach((label) => {
-				res.push(label.name);
+				if (label.name.startsWith("#")) {
+					res.push(longName(label.name));
+				}
 			});
+			break;
 		};
 	}
 	return res.join();

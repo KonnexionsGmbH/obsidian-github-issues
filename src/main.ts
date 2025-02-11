@@ -13,7 +13,7 @@ import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
 import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
 import { Issue, ClassLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
-import { Feature, Task, parseTaskNote, collectBadTaskAlerts, issueToTaskSync } from "./Tasks/Tasks";
+import { Feature, Task, parseTaskNote, collectBadTaskAlerts, issueToTaskSync, sortTaskNote } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
 import { parseIssuesToEmbed } from "./Issues/Issues.shared";
 import { reRenderView } from "./Utils/Utils";
@@ -159,9 +159,7 @@ export default class MyPlugin extends Plugin {
 
 				const allRepoLabelsPromise: Promise<ClassLabels> = api_get_labels(this.octokit, view_params);
 
-				let issues: Issue[] = await api_get_own_issues(this.octokit, view_params);
-
-				sortIssues(issues, IssueSortOrder.feature);
+				const openIssuesPromise: Promise<Issue[]> = api_get_own_issues(this.octokit, view_params);
 
 				let editor: Editor;
 				let facc: Feature[] = [];
@@ -174,6 +172,11 @@ export default class MyPlugin extends Plugin {
 						}
 					}
 				})
+
+				// let issues: Issue[] = await api_get_own_issues(this.octokit, view_params);
+				let issues: Issue[] = await openIssuesPromise;
+
+				sortIssues(issues, IssueSortOrder.feature);
 
 				let repo_class_labels: ClassLabels = await allRepoLabelsPromise;
 				if (facc.length > 0)  {
@@ -215,16 +218,12 @@ export default class MyPlugin extends Plugin {
 					console.log("bad_tasks_alerts: ", bad_tasks_alerts);
 
 					if (bad_tasks_alerts.length > 0) {
-
 						const bt = `The synchronisation between Obsidian and GitHub has been aborted because of below mentioned consistency errors in ${view_params.file_name}.
 						Please correct those. The GitHub Issues list which follows may help you with that.`;
 						createBadTaskAlert(el, bt);
 						bad_tasks_alerts.forEach((bt) => createBadTaskAlert(el, bt) );
-
-					} else {				
-
+					} else {									
 						issues.forEach((issue) => issueToTaskSync(issue, view_params, editor, facc, idns));
-		
 					}
 				};
 
