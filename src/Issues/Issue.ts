@@ -1,3 +1,4 @@
+import { Editor } from "obsidian";
 import { Label } from "../API/ApiHandler";
 import { IssueViewParams} from "../main";
 
@@ -16,6 +17,10 @@ export function longName(name:string): string {
 	return "#"+ ("000000" + id).slice(-6);
 }
 
+function prioFromName(name: string): number {
+    const names = [ 'p_backlog', 'p_low', 'p_high', 'p_highest', 'p_critical' ];
+    return names.indexOf(name);
+}
 
 /**
  * ClassLabels class
@@ -73,7 +78,17 @@ export class ClassLabels {
 			} else {
 				this.other_labels.push(label)
 			}
-		})
+		});
+		this.priority_labels.sort((l1, l2) => {
+			if (prioFromName(l1.name) > prioFromName(l2.name)) {
+				return -1;
+			}
+			if (prioFromName(l1.name) < prioFromName(l2.name)) {
+				return 1;
+			}
+			return 0;
+		});
+
 	}
 }
 
@@ -195,7 +210,7 @@ export function sortIssues(issues: Issue[], sort_order: IssueSortOrder) {
 	});
 
 	if (sort_order == IssueSortOrder.idDesc) {
-		issues = issues.sort((i1, i2) => {
+		issues.sort((i1, i2) => {
 			if (i1.sort_string > i2.sort_string) {
 				return -1;
 			}
@@ -205,7 +220,7 @@ export function sortIssues(issues: Issue[], sort_order: IssueSortOrder) {
 			return 0;
 		});
 	} else {
-		issues = issues.sort((i1, i2) => {
+		issues.sort((i1, i2) => {
 			if (i1.sort_string > i2.sort_string) {
 				return 1;
 			}

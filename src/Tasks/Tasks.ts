@@ -310,6 +310,12 @@ export function parseTaskNote(editor: Editor, view_params: IssueViewParams): Fea
         [this_feature, this_task] = finishFeature(this_feature, this_task, facc, tacc, editor.lineCount());
     }
     // console.log(facc);
+    sortAndPruneTasksNote(editor, facc, view_params);
+    // console.log(facc);
+    return facc;
+}
+
+function sortAndPruneTasksNote( editor: Editor, facc: Feature[], view_params: IssueViewParams) {
     let compression = 0;
     for (let f = 0; f < facc.length; f++) {
         if ((!facc[f].hidden) && (facc[f].tasks.length > 0)) {
@@ -350,13 +356,6 @@ export function parseTaskNote(editor: Editor, view_params: IssueViewParams): Fea
             editor.replaceRange(acc, {line: r_start, ch: 0}, {line: r_end, ch: 0});
         }
     }
-    console.log(facc);
-    return facc;
-}
-
-export function sortTaskNote(facc: Feature[], view_params: IssueViewParams, editor: Editor) {
-
-
 }
 
 export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewParams): [string[], Set<string>] {
@@ -403,23 +402,21 @@ export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewPara
 }
 
 function renderTask(task: Task, view_params: IssueViewParams): string {
-
     const header = '- [' + task.status_code + '] ' + view_params.task_token;        
-
     const res = [header, task.title].concat(
             task.cts.product_tokens).concat(
             task.cts.foreign_tokens).concat(
             task.cts.id_tokens).concat(     
             task.cts.priority_tokens).concat(
             task.cts.other_tokens).join(" ");        // .map(iid => shortIidToken(iid))
-
     // console.log("renderTask: ", res);
-
     return res;
 }
 
 function statusCodeFromAssignee( assignee: string ): string {
     // console.log( "Assignee to be inserted: ", a);
+    // simple hack which supports 25 contributors but their GitHub login must start with different letters
+    // need to peel out the user name from the task plugin configuration where the custom task states are named
     if (assignee != undefined) {
         if (assignee.length > 0){
             return assignee.slice(0,1).toLowerCase();
@@ -432,18 +429,26 @@ function statusCodeFromAssignee( assignee: string ): string {
 }
 
 export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], idns: Set<string>) {
-    const tid_token = "🆔";	
-    if ((issue.cls.feature_labels.length == 1) && 
-         (issue.cls.id_labels.length >= 1)  &&
-          (issue.cls.product_labels.length >= 1) && 
-           (issue.cls.priority_labels.length <= 1)) {
+    const tid_token = "🆔";
+    
+    if (issue.cls.feature_labels.length > 1) {
+        issue.findings.push('Issue cannot have more than one feature label');
+    } else if (issue.cls.feature_labels.length == 0) {
+        issue.findings.push('Issue will not be synced to Obsidian without a feature label');
+    } else if (issue.cls.priority_labels.length > 1) {
+        issue.findings.push('Issue cannot have more than one priority label');
+    } else if (issue.cls.product_labels.length == 0) {
+        issue.findings.push('Issue must have one or more product labels which are managed in this repo');
+    } else {
         let findings: string[] = [];
+        
         // issue has one feature and at least one product label, maybe we can sync it with tasks
         const i_feature = issue.cls.feature_labels[0].name; // issue has a feature label
         const i_id = issue.cls.id_labels[0].name;           // issue's id (long format)
         let t_task: Task;
         let t_found = false;
-        if ( idns.has(i_id) ) {   // task exists with id, find it in facc and check title, feature, assignee and labels
+        if ( idns.has(i_id) ) {   
+            // task exists with id, find it in facc and check title, feature, assignee and labels
             for (let f = 0; f < facc.length; f++) {
                 if (facc[f].tag == i_feature) {   // search for task under correct feature only
                     for (let t = 0; t < facc[f].tasks.length; t++) {
@@ -452,23 +457,23 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                             t_task = facc[f].tasks[t];
                             t_found = true;
                             if (t_task.cts.id_tokens.length < 2) {
-                                findings.push('Task does not have a task ID.');
+                                // findings.push('Task does not have a task ID.');
                             } else if (issue.description.contains(t_task.cts.id_tokens[1])) {
                                 // match, nothing to do
                             } else if (issue.description.contains(tid_token)) {
                                 findings.push('Task ID does not match link in issue description.');
                             } else { 
-                                issue.description = "synced to task " + t_task.cts.id_tokens[1] + issue.description;
+                                issue.description = "synced to task " + t_task.cts.id_tokens[1] + "\n" + issue.description;
                                 findings.push("Task ID link added to issue description.");
                             };
 
                             if (t_task.title != issue.title) {
                                 findings.push('Task title does not match the issue title.');
                             };
-                            if (t_task.status_code.toLowerCase() != issue.assignee.charAt(0).toLowerCase()) {
-                                findings.push(`Task status code ${t_task.status_code} does not match issue assignee.`);
+                            if (t_task.status_code.toLowerCase().trim() != issue.assignee.charAt(0).toLowerCase()) {
+                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignee ${issue.assignee}.`);
                             };
-                            if (t_task.cts.product_tokens != issue.cls.product_labels.map(label => label.name)) {
+                            if (t_task.cts.product_tokens.join() != issue.cls.product_labels.map(label => label.name).join()) {
                                 findings.push("Task product tags don't match issue product labels.");
                             };
                             break;                    
@@ -485,7 +490,9 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                 new Notice(`Syncing issue ${i_id} to tasks had ${findings.length} findings.`);
                 issue.findings = findings;
             }
+
         } else {  
+
             // no task with this id exists, we assume that it was created on GitHub and
             // insert it into the ReleasesNote under its feature (if that exists there)
             let f_inserted = -1;    // point to feature where task is to be inserted
@@ -529,14 +536,18 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
             }
 
             if (f_inserted > -1) {
-                // we need to correct facc so that we can use it for the next issue
+                // we want to insert a task. fot that, we need to correct
+                // the facc line number indexing so that we can use it for the next issue
+                // create task properties from the issue object 
                 const status_code = statusCodeFromAssignee(issue.assignee);
-                const mapped_tokens: string[] = [];
+                const mapped_tokens: string[] = []; // 
                 issue.cls.feature_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
                 issue.cls.product_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
                 issue.cls.id_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
                 issue.cls.priority_labels.forEach(label => mapped_tokens.push(prioTokenFromLabel(label)));
+
                 // console.log("Inserting Issue with these mapped_tokens: ", mapped_tokens);
+                
                 const cts = new ClassTokens(mapped_tokens, view_params); 
                 const sort_string = taskSortKey(issue.title, cts);
                 const new_task = new Task(t_start, t_start+1, issue.title, cts, sort_string, status_code);
@@ -566,15 +577,16 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
             
             if (issue.cls.foreign_labels.length > 0) {
                 // check if we need to insert a task for a foreign repo
-                // we don't have an issue idfor that and must search for
+                // we don't have an issue id for that and must search for
                 // title and foreign product token
 
                 // tbd
             }
         }
-    } else if (issue.cls.feature_labels.length > 1) {
-        issue.findings.push('Issue cannot have more than one feature label');
-    } else if (issue.cls.priority_labels.length >= 1) {
-        issue.findings.push('Issue cannot have more than one priority label');
     }
 }
+
+export function taskToIssueSync(task: Task, view_params: IssueViewParams, editor: Editor, facc: Feature[], idns: Set<string>, issues: Issue[]) {
+
+
+} 

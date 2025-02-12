@@ -13,9 +13,8 @@ import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
 import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
 import { Issue, ClassLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
-import { Feature, Task, parseTaskNote, collectBadTaskAlerts, issueToTaskSync, sortTaskNote } from "./Tasks/Tasks";
+import { Feature, Task, parseTaskNote, collectBadTaskAlerts, issueToTaskSync, taskToIssueSync } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
-import { parseIssuesToEmbed } from "./Issues/Issues.shared";
 import { reRenderView } from "./Utils/Utils";
 
 //enum for the appearance of the issues when pasted into the editor
@@ -85,13 +84,13 @@ IO-XPA Releases
 			for (let i = 4; i < source.length; i++) {
 				const words = source[i].trim().split("/");
 				if ((words.length > 1) && (words[1] == this.repo)) {
-					console.log("Repo token: ", source[i]);
+					console.log("Product token: ", source[i]);
 					this.product_tokens.push(words[0].trim());
 				} else if (words.length == 1) {
-					console.log("Repo token: ", source[i]);
+					console.log("Product token: ", source[i]);
 					this.product_tokens.push(words[0].trim());
 				} else {
-					console.log("Other token: ", source[i]);
+					console.log("Foreign token: ", source[i]);
 					this.foreign_tokens.push(words[0].trim())
 				}
 			}
@@ -179,13 +178,14 @@ export default class MyPlugin extends Plugin {
 				sortIssues(issues, IssueSortOrder.feature);
 
 				let repo_class_labels: ClassLabels = await allRepoLabelsPromise;
+
+				// console.log(repo_class_labels);
+
 				if (facc.length > 0)  {
 					const repo_labels = new Set<string>();
 					repo_class_labels.feature_labels.forEach((label) => {
 						repo_labels.add(label.name);
 					});
-
-					//console.log("Labels in GitHub: ", repo_labels);
 
 					const missing_labels = new Set<string>();
 					facc.forEach((feature) => {
@@ -215,7 +215,7 @@ export default class MyPlugin extends Plugin {
 
 					const [bad_tasks_alerts, idns] = collectBadTaskAlerts(facc, view_params);
 
-					console.log("bad_tasks_alerts: ", bad_tasks_alerts);
+					// console.log("bad_tasks_alerts: ", bad_tasks_alerts);
 
 					if (bad_tasks_alerts.length > 0) {
 						const bt = `The synchronisation between Obsidian and GitHub has been aborted because of below mentioned consistency errors in ${view_params.file_name}.
@@ -224,13 +224,30 @@ export default class MyPlugin extends Plugin {
 						bad_tasks_alerts.forEach((bt) => createBadTaskAlert(el, bt) );
 					} else {									
 						issues.forEach((issue) => issueToTaskSync(issue, view_params, editor, facc, idns));
+
+						for (let f=0; f < facc.length; f++) {
+							if (!facc[f].hidden) {
+								for (let t = 0; t < facc[f].tasks.length; t++) {
+									let task = facc[f].tasks[t];
+									if ((task.status_code > " ") || (task.cts.id_tokens.filter((name) => name.startsWith("#")).length == 1)) {
+										taskToIssueSync(task, view_params, editor, facc, idns);
+									}
+								}
+							}
+						}
 					}
 				};
+
+				if (issues.some( issue => issue.findings.length > 0 )) {
+					const bi = 'The task/issue checker had some findings. You may want to fix them now or later on whichever appropriate side. Look for red marks on the right border and more info in the detail modal comment text';
+					createBadTaskAlert(el, bi);
+				}
 
 				issues.forEach((issue) => {
 					IssueItems.createDefaultIssueElement(
 						el,
 						issue,
+						repo_class_labels,
 						this.octokit,
 						this.app,
 					)});
@@ -333,7 +350,7 @@ class GithubIssuesSettings extends PluginSettingTab {
 					.setPlaceholder("John Doe")
 					.setValue(this.plugin.settings.username)
 					.onChange(async (value) => {
-						console.log("Username: " + value);
+						// console.log("Username: " + value);
 						this.plugin.settings.username = value;
 						await this.plugin.saveSettings();
 						this.plugin.octokit = (await api_authenticate(
@@ -422,7 +439,7 @@ class GithubIssuesSettings extends PluginSettingTab {
 					.addOption(IssueAppearance.COMPACT, "Compact")
 					.setValue(this.plugin.settings.issue_appearance)
 					.onChange(async (value: IssueAppearance) => {
-						console.log("Appearance: " + value);
+						// console.log("Appearance: " + value);
 						this.plugin.settings.issue_appearance = value;
 						await this.plugin.saveSettings();
 
@@ -437,7 +454,7 @@ class GithubIssuesSettings extends PluginSettingTab {
 				toggle
 					.setValue(this.plugin.settings.show_searchbar)
 					.onChange(async (value) => {
-						console.log("Show Searchbar: " + value);
+						// console.log("Show Searchbar: " + value);
 						this.plugin.settings.show_searchbar = value;
 						await this.plugin.saveSettings();
 

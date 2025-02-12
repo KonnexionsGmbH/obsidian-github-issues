@@ -20,9 +20,12 @@ import { getTextColor } from "../../Utils/Color.utils";
 export class IssuesDetailsModal extends Modal {
 	issue: Issue;
 	octokit: Octokit;
-	constructor(app: App, issue: Issue, octokit: Octokit) {
+	repo_class_labels: ClassLabels;
+
+	constructor(app: App, issue: Issue, repo_class_labels: ClassLabels, octokit: Octokit) {
 		super(app);
 		this.issue = issue;
+		this.repo_class_labels = repo_class_labels;
 		this.octokit = octokit;
 	}
 
@@ -35,7 +38,17 @@ export class IssuesDetailsModal extends Modal {
 		const saveTitleButton = contentEl.createEl("button", { text: "Save Title" });
 		saveTitleButton.classList.add("issue-details-save-button");
 
-		this.showButtonOnInputChange(titleInput, saveTitleButton, this.issue.title);
+		//fetch the issue details
+		const spinner = loadingSpinner();
+		contentEl.appendChild(spinner);
+		const details = await api_get_issue_details(this.octokit, this.issue);
+		spinner.remove();
+		if (!details) {
+			contentEl.createEl("h3", { text: "Could not fetch issue details" });
+			return;
+		}
+
+		this.showButtonOnInputChange(titleInput, saveTitleButton, details.title);
 
 		saveTitleButton.onclick = async () => {
 			const updated = await api_update_issue(this.octokit, this.issue, {
@@ -47,16 +60,6 @@ export class IssuesDetailsModal extends Modal {
 			} else {
 				new Notice("Could not update issue");
 			}
-		}
-
-		//fetch the issue details
-		const spinner = loadingSpinner();
-		contentEl.appendChild(spinner);
-		const details = await api_get_issue_details(this.octokit, this.issue);
-		spinner.remove();
-		if (!details) {
-			contentEl.createEl("h3", { text: "Could not fetch issue details" });
-			return;
 		}
 
 		const createdContainer = contentEl.createDiv();
@@ -76,17 +79,28 @@ export class IssuesDetailsModal extends Modal {
 		issueLink.setAttribute("href", "https://github.com/" + this.issue.view_params?.owner + "/" + this.issue.view_params?.repo + "/issues/" + this.issue.number);
 		issueLink.classList.add("issue-details-link")
 
+		const assignedContainer = contentEl.createDiv();
+		// asignee login / icon
+		const assigneeIcon = assignedContainer.createEl("img");
+		assigneeIcon.classList.add("issue-details-assignee-icon");
+		let assignee_text = "";
 		if (details.assignee.login != undefined) {
-			const createdContainer = contentEl.createDiv();
-			//assignee icon
-			const assigneeIcon = createdContainer.createEl("img");
-			assigneeIcon.classList.add("issue-details-assignee-icon")
-			assigneeIcon.src = details?.assignee.avatar_url;
-			//asignee login
-			const assignee = createdContainer.createSpan({
-				text: `Assigned to ${details?.assignee.login}`
-			});
+			if (details.assignee.login == this.issue.assignee) {
+				assignee_text = `Assigned to ${details.assignee.login}`;
+				assigneeIcon.src = details?.assignee.avatar_url;
+				assignedContainer.classList.remove('issue-findings');
+			} else if (this.issue.assignee = "") {
+				assignee_text = `Unassign ${details.assignee.login}`;
+				assignedContainer.classList.add('issue-findings');
+			}
+		} else if (this.issue.assignee.length > 0) {
+			assignee_text = `Re-assign to ${this.issue.assignee}`;
+			assignedContainer.classList.add('issue-findings');
+		} else {
+			assignee_text = 'not assigned';
+			assignedContainer.classList.remove('issue-findings');
 		}
+		const assignee = assignedContainer.createSpan({ text: assignee_text	});
 
 		const stateAndLabelsContainer = contentEl.createDiv();
 		stateAndLabelsContainer.classList.add("issue-details-state-and-label-container")
@@ -129,7 +143,7 @@ export class IssuesDetailsModal extends Modal {
 		labelsGrid.classList.add("issue-details-labels-grid");
 
 		if (this.issue.view_params != null) {
-			const allLabels = await api_get_labels(this.octokit, this.issue.view_params);
+			const allLabels = this.repo_class_labels; // await api_get_labels(this.octokit, this.issue.view_params);
 			const originalSelections = new Set(details.labels.map(label => label.name));
 			const checkboxes: HTMLInputElement[] = [];
 
@@ -188,6 +202,12 @@ export class IssuesDetailsModal extends Modal {
 
 		const descriptionContainer = contentEl.createDiv();
 		descriptionContainer.classList.add("issue-details-description-container");
+
+		const headerContainer = descriptionContainer.createDiv();
+		headerContainer.classList.add("issue-details-author-container")
+
+		const descriptionHeader = headerContainer.createEl("span", { text: "Description:" });
+		descriptionHeader.classList.add("issue-details-author-name")
 
 		const previewDiv = descriptionContainer.createDiv();
 		previewDiv.classList.add("issue-details-description-preview");
@@ -308,6 +328,11 @@ export class IssuesDetailsModal extends Modal {
 
 		const commentsInput = contentEl.createEl("textarea");
 		commentsInput.classList.add("issue-details-comments-input")
+		if (this.issue.findings.length > 0) {
+			commentsInput.setText(this.issue.findings.join("\n"));
+			commentsInput.classList.add("issue-findings")
+		};
+		
 		//set the label
 		const commentsInputLabel = contentEl.createEl("label", { text: "Write a comment" });
 		commentsInputLabel.classList.add("issue-details-comments-input-label")
@@ -363,7 +388,7 @@ export class IssuesDetailsModal extends Modal {
 		labels: Label[],
 		checkboxes: HTMLElement[]
 	) {
-		for (let i = 0; i < Math.floor(labels.length / 2); i++) {
+		for (let i = 0; i < Math.floor((labels.length+1) / 2); i++) {
 			const row = labelsGrid.createDiv();
 			row.classList.add(i === 0 ? "issue-details-labels-row-first" : "issue-details-labels-row");
 
@@ -371,7 +396,7 @@ export class IssuesDetailsModal extends Modal {
 			this.createLabelElement(row, labels[i], originalSelections, checkboxes);
 
 			// Second label (if exists)
-			const secondIndex = i + Math.floor(labels.length / 2);
+			const secondIndex = i + Math.floor((labels.length+1) / 2);
 			if (secondIndex < labels.length) {
 				this.createLabelElement(row, labels[secondIndex], originalSelections, checkboxes);
 			}

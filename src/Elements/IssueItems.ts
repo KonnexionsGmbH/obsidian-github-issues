@@ -1,4 +1,4 @@
-import { Issue, allProperLabels } from "../Issues/Issue";
+import { Issue, allProperLabels, ClassLabels } from "../Issues/Issue";
 import { getPasteableTimeDelta } from "../Utils/Utils";
 import { IssuesDetailsModal } from "./Modals/IssuesDetailsModal";
 import { App } from "obsidian";
@@ -18,29 +18,34 @@ export class IssueItems {
 	public static createDefaultIssueElement(
 		el: HTMLElement,
 		issue: Issue,
+		repo_class_labels: ClassLabels,
 		ocotokit: Octokit,
 		app: App,
 	) {
 		const container = el.createDiv({ cls: "issue-items-container" });
+
+		if (issue.findings.length > 0) {
+			container.classList.add('issue-findings');
+		};
 
 		const title = container.createEl("h6", { text: issue.title });
 		title.classList.add("issue-items-title");
 
 		const details = container.createDiv();
 		const detailsContainer = details.createDiv();
-		 detailsContainer.classList.add("issue-items-details-container");
+		detailsContainer.classList.add("issue-items-details-container");
 
 		const creatorText = detailsContainer.createEl("span", {
 			text: `#${issue.number} opened ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`
 		});
 		creatorText.classList.add("issue-items-creator-text");
 
+		let assignee_text = 'unassigned';
 		if (issue.assignee) {
-			const assigneeText = detailsContainer.createEl("span", {
-				text: `assigned to ${issue.assignee}`
-			});
-			assigneeText.classList.add("issue-items-assignee-text");
-		}
+			assignee_text = `assigned to ${issue.assignee}`;
+		};
+		const assigneeText = detailsContainer.createEl("span", {text: assignee_text});
+		assigneeText.classList.add("issue-items-assignee-text");
 
 		const labelContainer = title.createDiv({ cls: "issue-items-label-container" });
 
@@ -61,7 +66,7 @@ export class IssueItems {
 		});
 
 		container.addEventListener("click", () => {
-			this.openIssueDetailsModal(app, container, el, issue, ocotokit, 'default');
+			this.openIssueDetailsModal(app, container, el, issue, repo_class_labels, ocotokit);
 		});
 	}
 
@@ -75,41 +80,34 @@ export class IssueItems {
 		IssueItems.lastHighlightedIssue = container;
 	}
 
-	private static openIssueDetailsModal(app: App, container: HTMLDivElement, parent: HTMLElement, issue: Issue, ocotokit: Octokit, type: 'default' | 'compact') {
+	private static openIssueDetailsModal(app: App, container: HTMLDivElement, parent: HTMLElement, issue: Issue, repo_class_labels: ClassLabels, ocotokit: Octokit) {
 		container.style.opacity = "0.5";
 		this.highlightIssue(container);
-		const modal = new IssuesDetailsModal(app, issue, ocotokit);
+		const modal = new IssuesDetailsModal(app, issue, repo_class_labels, ocotokit);
 		modal.onClose = async () => {
-			await IssueItems.reloadIssue(container, parent, issue, ocotokit, app, type);
+			await IssueItems.reloadIssue(container, parent, issue, ocotokit, app);
 		};
 		modal.open();
 	}
 
-	private static async reloadIssue(container: HTMLElement, parent: HTMLElement, issue: Issue, ocotokit: Octokit, app: App, type: 'default' | 'compact') {
+	private static async reloadIssue(container: HTMLElement, parent: HTMLElement, issue: Issue, ocotokit: Octokit, app: App) {
 		const updatedIssueDetail = await api_get_issue_details(ocotokit, issue);
 		if (updatedIssueDetail) {
 			issue.title = updatedIssueDetail.title;
 			issue.description = updatedIssueDetail.body;
 			// labels are updated on the issue object directly as the changes are not reflected in the issue object (from server) immediately
-			if (type === 'compact') {
-				const textSpan = container.querySelector('span');
-				if (textSpan) {
-					textSpan.textContent = `#${issue.number} • ${issue.title}`;
-				}
-			} else {
-				const titleEl = container.querySelector('.issue-items-title');
-				if (titleEl) {
-					titleEl.textContent = issue.title;
-					const labelContainer = titleEl.createDiv({ cls: "issue-items-label-container" });
+			const titleEl = container.querySelector('.issue-items-title');
+			if (titleEl) {
+				titleEl.textContent = issue.title;
+				const labelContainer = titleEl.createDiv({ cls: "issue-items-label-container" });
 
-					allProperLabels(issue.cls).forEach((label) => {
-						const labelEl = labelContainer.createDiv({ cls: "issue-items-label" });
-						labelEl.style.backgroundColor = `#${label.color}`;
-						labelEl.style.color = getTextColor(label.color);
-						labelEl.innerText = label.name;
-						labelEl.classList.add("issue-items-label");
-					});
-				}
+				allProperLabels(issue.cls).forEach((label) => {
+					const labelEl = labelContainer.createDiv({ cls: "issue-items-label" });
+					labelEl.style.backgroundColor = `#${label.color}`;
+					labelEl.style.color = getTextColor(label.color);
+					labelEl.innerText = label.name;
+					labelEl.classList.add("issue-items-label");
+				});
 			}
 		}
 	}
@@ -123,4 +121,5 @@ export function createBadTaskAlert(
 	const container = el.createDiv({ cls: "issue-items-container" });
 	const title = container.createEl("h6", { text: bt });
 	title.classList.add("issue-items-title");
+	title.classList.add("issue-findings");
 }

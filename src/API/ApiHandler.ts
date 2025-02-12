@@ -17,7 +17,7 @@ export async function api_authenticate(token: string, base_url: string): Promise
 	});
 
 	const res: OctokitResponse<never> = await octokit.request("GET /octocat", {});
-	console.log(res)
+	// console.log(res)
 	if (res.status === 200) {
 		return octokit;
 	} else {
@@ -35,7 +35,7 @@ export async function api_get_repos(octokit: Octokit) {
 			'X-GitHub-Api-Version': '2022-11-28'
 		}
 	})
-	console.log(res.data);
+	// console.log(res.data);
 	//return an array of the repo names and ids
 	return res.data.map((repo) => {
 		return {

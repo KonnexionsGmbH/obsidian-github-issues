@@ -51,6 +51,16 @@ To Embed the Issues of a GitHub repo into your Obsidian note, use the following 
 
 ````markdown
 ```github-issues
-Frostplexx/test-repo
+io-swiss/io-niesen
+IO-XPA Releases
+#task
+#hidden
+#App/io-ax4
+#Intelligence/io-intelligence
+#PM
+#Repo
+#Core
+#Server
+#User
 ```
 ````

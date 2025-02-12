@@ -198,7 +198,7 @@ export function getViewParamsInFile(app: App): IssueViewParams {
 				// console.log("end_line:", end_line);
 			}
 			else if ((start_line > -1) || (end_line == -1)) {
-				console.log("line: ", line);
+				// console.log("line: ", line);
 				source = source + line + "\n";
 			}
 		}
