@@ -119,7 +119,7 @@ export function createBadTaskAlert(
 	bt: string) 
 {
 	const container = el.createDiv({ cls: "issue-items-container" });
+	container.classList.add("issue-findings");
 	const title = container.createEl("h6", { text: bt });
 	title.classList.add("issue-items-title");
-	title.classList.add("issue-findings");
 }

@@ -13,7 +13,7 @@ import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
 import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
 import { Issue, ClassLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
-import { Feature, Task, parseTaskNote, collectBadTaskAlerts, issueToTaskSync, taskToIssueSync } from "./Tasks/Tasks";
+import { Feature, Task, parseTaskNote, collectBadTaskAlerts, sortAndPruneTasksNote, issueToTaskSync, taskToIssueSync } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
 import { reRenderView } from "./Utils/Utils";
 
@@ -147,7 +147,7 @@ export default class MyPlugin extends Plugin {
 						el.childNodes.forEach((child) => {
 							if (child instanceof HTMLElement) {
 								if (child.innerText.toLowerCase().includes(search)) {
-									child.style.display = "flex";
+									child.style.display = "block";
 								} else if (child !== searchfield) {
 									child.style.display = "none";
 								}
@@ -222,15 +222,23 @@ export default class MyPlugin extends Plugin {
 						Please correct those. The GitHub Issues list which follows may help you with that.`;
 						createBadTaskAlert(el, bt);
 						bad_tasks_alerts.forEach((bt) => createBadTaskAlert(el, bt) );
-					} else {									
-						issues.forEach((issue) => issueToTaskSync(issue, view_params, editor, facc, idns));
+					} else {
+
+						let iids: string[] = [];
+						for (let i=0; i < issues.length; i++) {
+							issueToTaskSync(issues[i], view_params, editor, facc, idns);
+							iids.push("#" + issues[i].number); // index for taskToIssueSync
+						}
+
+						sortAndPruneTasksNote(editor, facc, view_params);
 
 						for (let f=0; f < facc.length; f++) {
 							if (!facc[f].hidden) {
 								for (let t = 0; t < facc[f].tasks.length; t++) {
 									let task = facc[f].tasks[t];
-									if ((task.status_code > " ") || (task.cts.id_tokens.filter((name) => name.startsWith("#")).length == 1)) {
-										taskToIssueSync(task, view_params, editor, facc, idns);
+									if (task.cts.product_tokens.length > 0) {
+										// task refers to this repo
+										taskToIssueSync(task, view_params, editor, issues, iids, el, this.settings.username);
 									}
 								}
 							}

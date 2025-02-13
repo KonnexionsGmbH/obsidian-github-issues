@@ -200,11 +200,12 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 				color: label.color
 				} as Label;
 			})
-			const tl = new ClassLabels(mapped_labels, view_params, issue.number);
+			const description = issue.body ?? "";
+			const tl = new ClassLabels(mapped_labels, view_params, issue.number, description);
 			// console.log("Assignee login: ", issue.assignee?.login);
 			issues.push(new Issue(
 				issue.title,
-				issue.body ?? "",
+				description,
 				issue.user?.login ?? "",
 				issue.number,
 				issue.created_at,

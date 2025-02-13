@@ -4,7 +4,7 @@ import { IssueViewParams} from "../main";
 
 export enum IssueSortOrder {
 	feature = "Feature, Title, ...",
-	title = "Title, Feature, ...",
+	title = "Title, Product, ...",
 	idDesc = "Issue ID desc",
 	idAsc = "Issue ID asc"
   }
@@ -17,7 +17,7 @@ export function longName(name:string): string {
 	return "#"+ ("000000" + id).slice(-6);
 }
 
-function prioFromName(name: string): number {
+export function prioFromName(name: string): number {
     const names = [ 'p_backlog', 'p_low', 'p_high', 'p_highest', 'p_critical' ];
     return names.indexOf(name);
 }
@@ -31,9 +31,10 @@ export class ClassLabels {
 	foreign_labels: Label[];
 	priority_labels: Label[];
 	other_labels: Label[];
-	id_labels: Label[];
+	iid_labels: Label[];
+	tid_labels: Label[];
 
-	constructor(mapped_labels: Label[], view_params: IssueViewParams, iid?: number) {
+	constructor(mapped_labels: Label[], view_params: IssueViewParams, iid?: number, description?:string) {
 		const tid_token = "🆔";  // task id token
 		const pts: string[] = view_params.product_tokens;
 		const fts: string[] = view_params.foreign_tokens;
@@ -42,7 +43,8 @@ export class ClassLabels {
 		this.foreign_labels = [];
 		this.priority_labels = [];
 		this.other_labels = [];
-		this.id_labels = [];
+		this.iid_labels = [];
+		this.tid_labels = [];
 
 		const sorted_labels = mapped_labels.sort((l1,l2) => {
 			if (l1.name > l2.name) {
@@ -55,26 +57,30 @@ export class ClassLabels {
 		});
 		if (iid !== undefined) {
 			sorted_labels.push({name: "#" + iid, color: "ffffff"} as Label);
-		} 
+		};
+		
+		if (description != undefined) {
+			if (description.contains(tid_token)) {
+				const words = description.slice(description.indexOf(tid_token), 20).concat(" *").split(" ");
+				sorted_labels.push({name: words[0] + " " + words[1], color: "ffffff"} as Label);
+			}
+		}
 
 		sorted_labels.forEach((label) => {
 			if (pts.some( token => token == label.name )) {
 				this.product_labels.push(label);
-			}
-			else if (fts.some( token => token == label.name )) {
+			} else if (fts.some( token => token == label.name )) {
 				this.foreign_labels.push(label);
-			}
-			else if (label.name.search(/#/) == 0) {
-				if (isNaN(+label.name.substring(1))) {
-					this.feature_labels.push(label);
-				}
-				else {
-					this.id_labels.push(label);
-				}
+			} else if ( label.name.startsWith(tid_token) ) {
+				this.tid_labels.push(label)
 			} else if ( label.name.startsWith("p_") ) {
 				this.priority_labels.push(label)
-			} else if (label.name == tid_token) {
-				this.priority_labels.push(label);
+			} else if (label.name.startsWith("#")) {
+				if (isNaN(+label.name.substring(1))) {
+					this.feature_labels.push(label);
+				} else {
+					this.iid_labels.push(label);
+				}
 			} else {
 				this.other_labels.push(label)
 			}
@@ -93,7 +99,7 @@ export class ClassLabels {
 }
 
 export function allProperLabels(cls: ClassLabels): Label[] {
-	// notincluding id_labels
+	// notincluding iid_labels
 	return 	cls.feature_labels.concat(
 			cls.priority_labels).concat(
 			cls.other_labels).concat(
@@ -165,26 +171,26 @@ export function issueSortKey(title: string, tl: ClassLabels, sort_order: IssueSo
 			tl.product_labels.forEach((label) => {
 				res.push(label.name);
 			});
-			tl.id_labels.forEach((label) => {
+			tl.iid_labels.forEach((label) => {
 				res.push(label.name);
 			});
 			break;
 		};
 		case IssueSortOrder.title: {
 			res.push(title);
-			tl.feature_labels.forEach((label) => {
-				res.push(label.name);
-			});
 			tl.product_labels.forEach((label) => {
 				res.push(label.name);
 			});
-			tl.id_labels.forEach((label) => {
+			tl.feature_labels.forEach((label) => {
+				res.push(label.name);
+			});
+			tl.iid_labels.forEach((label) => {
 				res.push(label.name);
 			});
 			break;
 		};
 		case IssueSortOrder.idAsc: {
-			tl.id_labels.forEach((label) => {
+			tl.iid_labels.forEach((label) => {
 				if (label.name.startsWith("#")) {
 					res.push(longName(label.name));
 				}
@@ -192,7 +198,7 @@ export function issueSortKey(title: string, tl: ClassLabels, sort_order: IssueSo
 			break;
 		};
 		case IssueSortOrder.idDesc: {
-			tl.id_labels.forEach((label) => {
+			tl.iid_labels.forEach((label) => {
 				if (label.name.startsWith("#")) {
 					res.push(longName(label.name));
 				}
