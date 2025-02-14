@@ -1,10 +1,9 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, MarkdownView, Editor} from "obsidian";
+import { App, Notice, Plugin, PluginSettingTab, Setting, Editor} from "obsidian";
 import {
 	api_authenticate,
 	api_get_own_issues,
 	api_get_labels,
 	Label,
-	RepoItem,
 	api_create_new_label
 } from "./API/ApiHandler";
 import { IssuesModal } from "./Elements/Modals/IssuesModal";
@@ -58,6 +57,9 @@ IO-XPA Releases
 #task
 #hidden
 #App/io-ax4
+#Intelligence/io-intelligence
+#PM
+#Repo
 #Core
 #Server
 #User
@@ -238,7 +240,7 @@ export default class MyPlugin extends Plugin {
 									let task = facc[f].tasks[t];
 									if (task.cts.product_tokens.length > 0) {
 										// task refers to this repo
-										taskToIssueSync(task, view_params, editor, issues, iids, el, this.settings.username);
+										taskToIssueSync(task, this.octokit, view_params, editor, issues, iids, el, this.settings.username);
 									}
 								}
 							}

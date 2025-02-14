@@ -52,9 +52,9 @@ export async function api_get_repos(octokit: Octokit) {
 /**
  * Creates new labels on GitHub
  * @param octokit
+ * @param view_params
  */
-
-export async function api_create_new_label(octokit: Octokit, view_params: IssueViewParams | null, name: string) {
+export async function api_create_new_label(octokit: Octokit, view_params: IssueViewParams, name: string) {
 	if (view_params == null) return false;
 	const res = await octokit.request('POST /repos/{owner}/{repo}/labels', {
 	owner: view_params.owner,
@@ -70,11 +70,10 @@ export async function api_create_new_label(octokit: Octokit, view_params: IssueV
 }
 
 
-
 /**
- * Returns all the labels of a repo as an array of strings with their names
+ * Returns all the labels of a repo as an object of classified labels
  * @param octokit
- * @param repo
+ * @param view_params
  */
 export async function api_get_labels(octokit: Octokit, view_params: IssueViewParams): Promise<ClassLabels> {
 
@@ -106,21 +105,46 @@ export async function api_get_labels(octokit: Octokit, view_params: IssueViewPar
  * @param issue
  * @returns true if the issue was submitted successfully
  */
-export async function api_submit_issue(octokit: Octokit, view_params: IssueViewParams, issue: SubmittableIssue) {
+export async function api_submit_issue(octokit: Octokit, view_params: IssueViewParams, issue: SubmittableIssue): Promise<Issue[]> {
 
 	const res = await octokit.request('POST /repos/{owner}/{repo}/issues', {
 		owner: view_params.owner,
 		repo: view_params.repo,
 		title: issue.title,
 		body: issue.description,
-		assignees: [],  // view_params.owner
+		assignees: issue.assignees, 
 		labels: issue.labels,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
 		}
 	})
 
-	return res.status == 201;
+	console.log("api_submit_issue result: ", res);
+	
+	if (res.status == 201) {
+
+			const mapped_labels = res.data.labels.map((label: any) => {
+			return {
+				name: label.name,
+				color: label.color
+				} as Label;
+			})
+			const description = res.data.body ?? "";
+			const tl = new ClassLabels(mapped_labels, view_params, res.data.number, description);
+			// console.log("Assignee login: ", issue.assignee?.login);
+			return [new Issue(
+				res.data.title,
+				description,
+				res.data.user?.login ?? "",
+				res.data.number,
+				res.data.created_at,
+				res.data.assignee?.login ?? "",
+				tl,
+				view_params
+			)];
+	} else {
+		return [];
+	}
 }
 
 /**
@@ -392,4 +416,5 @@ export interface SubmittableIssue {
 	title: string;
 	description: string;
 	labels: string[];
+	assignees: string[];
 }

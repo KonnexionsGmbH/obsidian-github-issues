@@ -3,6 +3,7 @@ import { Label, SubmittableIssue, api_submit_issue } from "../API/ApiHandler";
 import { Editor, Notice } from "obsidian";
 import { IssueViewParams } from "../main";
 import { createBadTaskAlert } from "../Elements/IssueItems";
+import { Octokit } from "@octokit/core";
 
 /**
  * ClassLabels class
@@ -603,7 +604,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
     }
 }
 
-export function taskToIssueSync(task: Task, view_params: IssueViewParams, editor: Editor, issues: Issue[], iids: string[], el: HTMLElement, user: string) {
+export function taskToIssueSync(task: Task, octokit: Octokit, view_params: IssueViewParams, editor: Editor, issues: Issue[], iids: string[], el: HTMLElement, user: string) {
 
     const status_obsolete = "xX-";
 
@@ -633,50 +634,51 @@ export function taskToIssueSync(task: Task, view_params: IssueViewParams, editor
         } else {
 
             let description = task.description;
-            if (task.description == "\n") {
-                task.description = "";
-            }
             if (task.cts.tid_tokens.length == 1) {
-                description = "\n" + "synced to task " + task.cts.tid_tokens[0];
+                description = "synced from task " + task.cts.tid_tokens[0] + "\n" + description;
             };
             
-            const mapped_labels: Label[] = [];
+            const mapped_tokens: string[] = [];
 
             task.cts.feature_tokens.forEach((token) => {
-                mapped_labels.push({name: token, color: "aaaaaa"} as Label);
+                mapped_tokens.push(token);
             });
             
             task.cts.priority_tokens.forEach((token) => {
-                mapped_labels.push({name: prioNameFromToken(token), color: "000000"} as Label);
+                mapped_tokens.push(prioNameFromToken(token));
             });
             
             task.cts.product_tokens.forEach((token) => { 
-                mapped_labels.push({name: token, color: "000000"} as Label);
+                mapped_tokens.push(token);
             });
 
             task.cts.tid_tokens.forEach((token) => { 
-                mapped_labels.push({name: token, color: "000000"} as Label);
+                mapped_tokens.push(token);
             });
             
-            let cls = new ClassLabels (mapped_labels, view_params);
-            const issue = new Issue(task.title, description, user, -1, "",  assignees[0], cls, view_params);
-
-            issues.push(issue);
-            const message = "Issue added: " + task.cts.feature_tokens + " " + task.title + " " + task.cts.product_tokens.join(" ");
-            new Notice (message);
-            console.log(message);
-            console.log(issue);
-
-            async () => {
-                const submitted = await api_submit_issue(
-                    this.ocotoBundle.octokit,
+            let new_issues: Issue[] = [];
+            async function asyncCall() {
+                new_issues = await api_submit_issue(
+                    octokit,
                     view_params,
-                    {
-                        labels: allProperLabels(cls).map((label) => label.name),
-                        title: task.title,
+                    {   title: task.title,
                         description: description,
+                        labels: mapped_tokens,
+                        assignees: assignees
                     } as SubmittableIssue
                 );
+            };
+            asyncCall();
+
+            if (new_issues.length != 1) {
+                const message = ["Cannot create new issue", task.cts.feature_tokens[0], "/", task.title, "/"].join(" ");
+                new Notice (message);
+                console.log(message);
+            } else {
+                issues.push(new_issues[0]);
+                const message = ["New issue created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" ");
+                new Notice (message);
+                console.log(message);
             }
         }
     }
