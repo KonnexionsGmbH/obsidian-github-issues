@@ -126,7 +126,7 @@ export class IssuesDetailsModal extends Modal {
 				color: label.color
 			} as Label;
 		})
-		const tl = new ClassLabels(mapped_labels, this.issue.view_params);
+		const tl = new ClassLabels(mapped_labels, this.issue.view_params, this.issue.number, this.issue.description);
 		
 		//loop through the labels
 		// eslint-disable-next-line no-unsafe-optional-chaining
@@ -191,7 +191,7 @@ export class IssuesDetailsModal extends Modal {
 					this.issue.cls = new ClassLabels(
 						selectedLabels.map(label => { return { name: label, color: labels.find(l => l.name == label)?.color } as Label; })
 						, this.issue.view_params
-						, this.issue.number);
+						, this.issue.number, this.issue.description);
 					saveLabelsButton.classList.remove("visible");
 					// this.close();
 				} else {

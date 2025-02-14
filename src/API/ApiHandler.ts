@@ -173,7 +173,7 @@ export async function api_get_issues_by_url(octokit: Octokit, url: string, view_
 						color: label.color
 					} as Label;
 				})
-				const tl = new ClassLabels(mapped_labels, view_params);
+				const tl = new ClassLabels(mapped_labels, view_params, issue.number, issue.body ?? "");
 		
 				issues.push(new Issue(
 					issue.title,

@@ -573,6 +573,8 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                 editor.replaceSelection(renderTask(new_task, view_params) + "\n");
                 new Notice("Inserting new task from issue #" + issue.number);
                 console.log("Inserting new task from issue #" + issue.number);
+                new_task.cts.tid_tokens.forEach((token) => {idns.add(token)});
+                new_task.cts.iid_tokens.forEach((token) => {idns.add(token)});
                 facc[f_insert].tasks.splice(t_insert, 0, new_task);
                 for (let f = 0; f < facc.length; f++) {
                     if (f == f_insert) {
@@ -604,7 +606,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
     }
 }
 
-export function taskToIssueSync(task: Task, octokit: Octokit, view_params: IssueViewParams, editor: Editor, issues: Issue[], iids: string[], el: HTMLElement, user: string) {
+export function taskToIssueSync(task: Task, octokit: Octokit, view_params: IssueViewParams, editor: Editor, issues: Issue[], iids: string[], bad_tasks_alerts: string[], user: string) {
 
     const status_obsolete = "xX-";
 
@@ -618,7 +620,7 @@ export function taskToIssueSync(task: Task, octokit: Octokit, view_params: Issue
         } else if (status_obsolete.includes(task.status_code)) {
             // issue is closed or cancelled, ok 
         } else {
-            createBadTaskAlert(el, [task.cts.feature_tokens[0], "/", task.title,"/"].concat(task.cts.iid_tokens[0]).concat(["should have an open issue"]).join(" "));
+            bad_tasks_alerts.push([task.cts.feature_tokens[0], "/", task.title,"/"].concat(task.cts.iid_tokens[0]).concat(["should have an open issue"]).join(" "));
         }
 
     } else if (task.status_code > " ") {
@@ -668,15 +670,22 @@ export function taskToIssueSync(task: Task, octokit: Octokit, view_params: Issue
                     } as SubmittableIssue
                 );
             };
+
             asyncCall();
 
-            if (new_issues.length != 1) {
-                const message = ["Cannot create new issue", task.cts.feature_tokens[0], "/", task.title, "/"].join(" ");
+            console.log(new_issues);
+
+            if (new_issues.length == 1) {
+                issues.push(new_issues[0]);
+                task.cts.iid_tokens.push(new_issues[0].cls.iid_labels[0].name);
+                editor.setCursor({ line: task.start, ch: 0 });
+                editor.replaceSelection(renderTask(task, view_params) + "\n");
+                const message = ["New issue created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" ");
                 new Notice (message);
                 console.log(message);
             } else {
-                issues.push(new_issues[0]);
-                const message = ["New issue created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" ");
+                const message = ["Cannot create new issue", task.cts.feature_tokens[0], "/", task.title, "/"].join(" ");
+                bad_tasks_alerts.push(message);
                 new Notice (message);
                 console.log(message);
             }

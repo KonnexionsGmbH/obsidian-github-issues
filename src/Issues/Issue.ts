@@ -135,28 +135,6 @@ export class Issue {
 	}
 }
 
-/**
- * Issue class for CSV
- */
-export class CSVIssue extends Issue {
-    constructor(csv: string, view_params: IssueViewParams){
-		const split = csv.split(',');
-        const issue_number: number = parseInt(split[0]);
-        const issue_title: string = split[1];
-        const issue_author: string = split[2];
-        const issue_created_at: string = split[3];
-		const mapped_labels = split[4].split(';').map((label: string) => {
-			return {
-				name: label.split('#')[0],
-				color: label.split('#')[1]
-			} as Label
-		});
-		const tl = new ClassLabels(mapped_labels, view_params);
-        super(issue_title, "", issue_author, issue_number, issue_created_at, "", tl, view_params);
-    }
-}
-
-
 /*
  * Constructs a string which can be used to sort issues by features then issue title then products
  */

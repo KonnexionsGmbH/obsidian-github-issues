@@ -220,7 +220,7 @@ export default class MyPlugin extends Plugin {
 					// console.log("bad_tasks_alerts: ", bad_tasks_alerts);
 
 					if (bad_tasks_alerts.length > 0) {
-						const bt = `The synchronisation between Obsidian and GitHub has been aborted because of below mentioned consistency errors in ${view_params.file_name}.
+						const bt = `The synchronisation from GitHub to Obsidian has been aborted because of below mentioned consistency errors in ${view_params.file_name}.
 						Please correct those. The GitHub Issues list which follows may help you with that.`;
 						createBadTaskAlert(el, bt);
 						bad_tasks_alerts.forEach((bt) => createBadTaskAlert(el, bt) );
@@ -240,10 +240,15 @@ export default class MyPlugin extends Plugin {
 									let task = facc[f].tasks[t];
 									if (task.cts.product_tokens.length > 0) {
 										// task refers to this repo
-										taskToIssueSync(task, this.octokit, view_params, editor, issues, iids, el, this.settings.username);
+										taskToIssueSync(task, this.octokit, view_params, editor, issues, iids, bad_tasks_alerts, this.settings.username);
 									}
 								}
 							}
+						}
+						if (bad_tasks_alerts.length > 0) {
+							const bt = 'The synchronisation from Obsidian to GitHub failed (at least partoially). Please check the following findings.';
+							createBadTaskAlert(el, bt);
+							bad_tasks_alerts.forEach((bt) => createBadTaskAlert(el, bt) );
 						}
 					}
 				};
@@ -251,8 +256,10 @@ export default class MyPlugin extends Plugin {
 				if (issues.some( issue => issue.findings.length > 0 )) {
 					const bi = 'The task/issue checker had some findings. You may want to fix them now or later on whichever appropriate side. Look for red marks on the right border and more info in the detail modal comment text';
 					createBadTaskAlert(el, bi);
-				}
+				};
 
+				sortIssues(issues, IssueSortOrder.feature);
+				
 				issues.forEach((issue) => {
 					IssueItems.createDefaultIssueElement(
 						el,
