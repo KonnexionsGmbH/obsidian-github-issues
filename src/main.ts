@@ -162,6 +162,8 @@ export default class MyPlugin extends Plugin {
 
 				const openIssuesPromise: Promise<Issue[]> = api_get_own_issues(this.octokit, view_params);
 
+				let open_issue_count = -1;
+
 				let editor: Editor;
 				let facc: Feature[] = [];
 				this.app.workspace.iterateRootLeaves((leaf) => {
@@ -176,8 +178,10 @@ export default class MyPlugin extends Plugin {
 
 				// let issues: Issue[] = await api_get_own_issues(this.octokit, view_params);
 				let issues: Issue[] = await openIssuesPromise;
+				
+				open_issue_count = issues.length;
 
-				sortIssues(issues, IssueSortOrder.feature);
+				// sortIssues(issues, IssueSortOrder.feature);
 
 				let repo_class_labels: ClassLabels = await allRepoLabelsPromise;
 
@@ -215,9 +219,11 @@ export default class MyPlugin extends Plugin {
 						}
 					});
 
-					const [bad_tasks_alerts, idns] = collectBadTaskAlerts(facc, view_params);
+					const [bad_tasks_alerts, set_ids, set_titles] = collectBadTaskAlerts(facc, view_params);
 
-					// console.log("bad_tasks_alerts: ", bad_tasks_alerts);
+					console.log("bad_tasks_alerts: ", bad_tasks_alerts);
+					console.log (set_titles);
+
 
 					if (bad_tasks_alerts.length > 0) {
 						const bt = `The synchronisation from GitHub to Obsidian has been aborted because of below mentioned consistency errors in ${view_params.file_name}.
@@ -228,7 +234,7 @@ export default class MyPlugin extends Plugin {
 
 						let iids: string[] = [];
 						for (let i=0; i < issues.length; i++) {
-							issueToTaskSync(issues[i], view_params, editor, facc, idns);
+							issueToTaskSync(issues[i], view_params, editor, facc, set_ids, set_titles);
 							iids.push("#" + issues[i].number); // index for taskToIssueSync
 						}
 
@@ -240,24 +246,30 @@ export default class MyPlugin extends Plugin {
 									let task = facc[f].tasks[t];
 									if (task.cts.product_tokens.length > 0) {
 										// task refers to this repo
-										taskToIssueSync(task, this.octokit, view_params, editor, issues, iids, bad_tasks_alerts, this.settings.username);
+										await taskToIssueSync(task, this.octokit, view_params, editor, issues, iids, bad_tasks_alerts, this.settings.username);
 									}
 								}
 							}
 						}
 						if (bad_tasks_alerts.length > 0) {
-							const bt = 'The synchronisation from Obsidian to GitHub failed (at least partoially). Please check the following findings.';
+							const bt = 'The synchronisation from Obsidian to GitHub failed (at least partially). Please check the following findings.';
 							createBadTaskAlert(el, bt);
 							bad_tasks_alerts.forEach((bt) => createBadTaskAlert(el, bt) );
 						}
 					}
 				};
 
-				if (issues.some( issue => issue.findings.length > 0 )) {
+				if (open_issue_count == 100) {
+
+					const bi = 'The repo contains more than 100 open issues. This alone leads to some of the finding reported below. Please do not leave issues open longer than necessary.';
+					createBadTaskAlert(el, bi);
+
+				} else if (issues.some( issue => issue.findings.length > 0 )) {
+
 					const bi = 'The task/issue checker had some findings. You may want to fix them now or later on whichever appropriate side. Look for red marks on the right border and more info in the detail modal comment text';
 					createBadTaskAlert(el, bi);
 				};
-
+				
 				sortIssues(issues, IssueSortOrder.feature);
 				
 				issues.forEach((issue) => {

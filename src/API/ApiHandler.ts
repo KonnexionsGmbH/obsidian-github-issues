@@ -211,6 +211,7 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues', {
 		owner: view_params.owner,
 		repo: view_params.repo,
+		per_page: 100,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
 		}

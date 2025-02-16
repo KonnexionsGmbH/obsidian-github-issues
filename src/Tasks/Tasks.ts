@@ -305,9 +305,9 @@ export function parseTaskNote(editor: Editor, view_params: IssueViewParams): Fea
     if (this_feature.length > 0) {
         [this_feature, this_task] = finishFeature(this_feature, this_task, facc, tacc, editor.lineCount());
     }
-    // console.log(facc);
+    console.log(facc);
     sortAndPruneTasksNote(editor, facc, view_params);
-    // console.log(facc);
+    console.log(facc);
     return facc;
 }
 
@@ -346,18 +346,18 @@ export function sortAndPruneTasksNote( editor: Editor, facc: Feature[], view_par
                 acc = acc + renderTask(facc[f].tasks[t], view_params) + facc[f].tasks[t].description + "\n";
             };
             compression = compression + idx - r_end; // correct feature.end and following features with this
-            // console.log("New compression: ", compression);
+            console.log("New compression: ", compression);
             facc[f].end += compression;
-            // console.log(acc);
+            console.log(acc);
             editor.replaceRange(acc, {line: r_start, ch: 0}, {line: r_end, ch: 0});
         }
     }
 }
 
-export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewParams): [string[], Set<string>] {
+export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewParams): [string[], Set<string>, Set<string>] {
     const bad_task_alerts: string[] = [];
-    const idns = new Set<string>();     // issue ids for this repo over all features
-    const title_products = new Set<string>();   // title_product strings for this repoover all features
+    const set_ids = new Set<string>();     // issue ids for this repo over all features
+    const set_titles = new Set<string>();   // title + " " + product strings for this repo over all features
     facc.forEach((feature) => {
         feature.tasks.forEach((task) => {
             const pts:string[] = [];    // product_tokens
@@ -378,35 +378,37 @@ export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewPara
 
             task.cts.product_tokens.forEach((token) => {
                 const search = task.title + " " + token;
-                if (title_products.has(search)) {
-                    bad_task_alerts.push([feature.tag, "/", task.title, "/"].concat(["conflicts with same title above for " + token]).join(" "));
+                if (set_titles.has(search)) {
+                    bad_task_alerts.push([feature.tag, "/", task.title, "/"].concat(["conflicts with same title for " + token]).join(" "));
                 } else {
-                    title_products.add(search);
+                    set_titles.add(search);
                 }                
             });
 
             task.cts.iid_tokens.forEach((iid) => {
                 if (pts.length > 0) {
                     // only consider other iids for same repo
-                    if (idns.has(iid)) {
+                    if (set_ids.has(iid)) {
                         bad_task_alerts.push([feature.tag, "/", task.title,"/"].concat(iid).concat(["conflicts with same issue id above"]).join(" "));
                     } else {
-                        idns.add(iid);
+                        set_ids.add(iid);
                     }
                 }
             });
 
             task.cts.tid_tokens.forEach((tid) => {
-                if (idns.has(tid)) {
+                if (set_ids.has(tid)) {
                     bad_task_alerts.push([feature.tag, "/", task.title,"/"].concat(tid).concat(["conflicts with same task id above"]).join(" "));
                 } else {
-                    idns.add(tid);
+                    set_ids.add(tid);
                 }
             });
         })
     })
-    console.log("All ID Set: " , idns);
-    return [bad_task_alerts, idns] ;
+
+    // console.log("All ID Set: " , set_ids);
+    
+    return [bad_task_alerts, set_ids, set_titles] ;
 }
 
 function renderTask(task: Task, view_params: IssueViewParams): string {
@@ -437,7 +439,7 @@ function statusCodeFromAssignee( assignee: string ): string {
     }
 }
 
-export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], idns: Set<string>) {
+export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], set_ids: Set<string>, set_titles: Set<string>) {
     
     const tid_token = "🆔";
     
@@ -459,7 +461,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
         let t_task: Task;
         let t_found = false;
         let f_found = false;
-        if ( idns.has(i_id) ) {   
+        if ( set_ids.has(i_id) ) {   
             // task exists with id, find it in facc and check title, feature, assignee and labels
             for (let f = 0; f < facc.length; f++) {
                 if (facc[f].tag == i_feature) {
@@ -509,8 +511,13 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                 issue.findings = findings;
             }
 
-        } else {  
+        } else if (issue.cls.product_labels.filter(label => set_titles.has(issue.title + " " + label.name)).length > 0) {
 
+            // a matching task without iid token exists. this should not happen often and can be fixed manually
+            issue.findings.push('This issue cannot be linked automatically with its task. Find it by title and product and assign the id manually.');
+            new Notice(`Syncing issue ${i_id} to tasks had one finding.`);
+
+        } else {   
             // no task with this id exists, we assume that it was created on GitHub and
             // insert it into the ReleasesNote under its feature (if that exists there)
             let f_insert = -1;    // point to feature where task is to be inserted
@@ -569,12 +576,12 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                 const cts = new ClassTokens(mapped_tokens, view_params); 
                 const sort_string = taskSortKey(issue.title, cts);
                 const new_task = new Task(t_start, t_start+1, issue.title, "", cts, sort_string, status_code);
-                editor.setCursor({ line: t_start, ch: 0 });
-                editor.replaceSelection(renderTask(new_task, view_params) + "\n");
+                editor.replaceRange(renderTask(new_task, view_params) + "\n", { line: t_start, ch: 0 }, { line: t_start + 1, ch: 0 });
                 new Notice("Inserting new task from issue #" + issue.number);
                 console.log("Inserting new task from issue #" + issue.number);
-                new_task.cts.tid_tokens.forEach((token) => {idns.add(token)});
-                new_task.cts.iid_tokens.forEach((token) => {idns.add(token)});
+                new_task.cts.tid_tokens.forEach((token) => {set_ids.add(token)});
+                new_task.cts.iid_tokens.forEach((token) => {set_ids.add(token)});
+                new_task.cts.product_tokens.forEach((token) => {set_titles.add(issue.title + " " + token)});
                 facc[f_insert].tasks.splice(t_insert, 0, new_task);
                 for (let f = 0; f < facc.length; f++) {
                     if (f == f_insert) {
@@ -606,7 +613,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
     }
 }
 
-export function taskToIssueSync(task: Task, octokit: Octokit, view_params: IssueViewParams, editor: Editor, issues: Issue[], iids: string[], bad_tasks_alerts: string[], user: string) {
+export async function taskToIssueSync(task: Task, octokit: Octokit, view_params: IssueViewParams, editor: Editor, issues: Issue[], iids: string[], bad_tasks_alerts: string[], user: string) {
 
     const status_obsolete = "xX-";
 
@@ -624,9 +631,13 @@ export function taskToIssueSync(task: Task, octokit: Octokit, view_params: Issue
         }
 
     } else if (task.status_code > " ") {
-        // task may need to be created in repo
+        console.log(task.status_code.toLowerCase());
+
+        // task may need to be created as an issue in repo
         let assignees = logins.filter(l => l.startsWith(task.status_code.toLowerCase()));
-        
+
+        console.log(assignees);
+
         if (assignees.length == 0) {
             
             const message = "Cannot determine assignee from status code [" + task.status_code + "]";
@@ -657,28 +668,29 @@ export function taskToIssueSync(task: Task, octokit: Octokit, view_params: Issue
             task.cts.tid_tokens.forEach((token) => { 
                 mapped_tokens.push(token);
             });
-            
-            let new_issues: Issue[] = [];
-            async function asyncCall() {
-                new_issues = await api_submit_issue(
-                    octokit,
-                    view_params,
-                    {   title: task.title,
-                        description: description,
-                        labels: mapped_tokens,
-                        assignees: assignees
-                    } as SubmittableIssue
-                );
-            };
 
-            asyncCall();
+            console.log(["New issue to be created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" "));
+            
+            let new_issues: Issue[] = await api_submit_issue(
+                octokit,
+                view_params,
+                {   title: task.title,
+                    description: description,
+                    labels: mapped_tokens,
+                    assignees: assignees
+                } as SubmittableIssue
+            );
 
             console.log(new_issues);
+            console.log()
 
             if (new_issues.length == 1) {
                 issues.push(new_issues[0]);
+                iids.push("#" + new_issues[0].number);
                 task.cts.iid_tokens.push(new_issues[0].cls.iid_labels[0].name);
                 editor.setCursor({ line: task.start, ch: 0 });
+                const new_task = renderTask(task, view_params) + "\n";
+                console.log(new_task);
                 editor.replaceSelection(renderTask(task, view_params) + "\n");
                 const message = ["New issue created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" ");
                 new Notice (message);
