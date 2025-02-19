@@ -12,7 +12,7 @@ import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
 import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
 import { Issue, ClassLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
-import { Feature, Task, parseTaskNote, collectBadTaskAlerts, sortAndPruneTasksNote, issueToTaskSync, taskToIssueSync } from "./Tasks/Tasks";
+import { Feature, Task, parseTaskNote, collectBadTaskAlerts, sortAndPruneTasksNote, issueToTaskSync, issueToForeignTaskSync, taskToIssueSync } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
 import { reRenderView } from "./Utils/Utils";
 
@@ -71,32 +71,33 @@ IO-XPA Releases
         this.file_name = "";
 
 		if (source.length > 1) { 
-			console.log("File name: ", source[1]);
+			// console.log("File name: ", source[1]);
 			this.file_name = source[1].trim()
 		};
 		if (source.length > 2) { 
-			console.log("Task token: ", source[2]);
+			// console.log("Task token: ", source[2]);
 			this.task_token = source[2].trim()
 		};
 		if (source.length > 3) { 
-			console.log("Hidden token: ", source[3]);
+			// console.log("Hidden token: ", source[3]);
 			this.hidden_token = source[3].trim()
 		};
 		if (source.length > 4) {
 			for (let i = 4; i < source.length; i++) {
 				const words = source[i].trim().split("/");
 				if ((words.length > 1) && (words[1] == this.repo)) {
-					console.log("Product token: ", source[i]);
+					// console.log("Product token: ", source[i]);
 					this.product_tokens.push(words[0].trim());
 				} else if (words.length == 1) {
-					console.log("Product token: ", source[i]);
+					// console.log("Product token: ", source[i]);
 					this.product_tokens.push(words[0].trim());
 				} else {
-					console.log("Foreign token: ", source[i]);
+					// console.log("Foreign token: ", source[i]);
 					this.foreign_tokens.push(words[0].trim())
 				}
 			}
 		}
+		console.log(this);
 	}
 }
 
@@ -105,6 +106,7 @@ export default class MyPlugin extends Plugin {
 	octokit: Octokit = new Octokit({ auth: "" });
 
 	async onload() {
+
 		await this.loadSettings();
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new GithubIssuesSettings(this.app, this));
@@ -171,7 +173,12 @@ export default class MyPlugin extends Plugin {
 						this.app.workspace.setActiveLeaf(leaf, { focus: false });
 						if (leaf.view) {							
 							editor = leaf.view.editor;		// compiler sees a problem here but it works
-							facc = parseTaskNote(editor, view_params);
+							facc = parseTaskNote(editor, view_params, facc);
+							console.log("facc after load/parse");
+							console.log(structuredClone(facc));
+						    // sortAndPruneTasksNote(editor, facc, view_params);
+							// console.log("facc after load/parse/sort");
+							// console.log(structuredClone(facc));
 						}
 					}
 				})
@@ -222,7 +229,8 @@ export default class MyPlugin extends Plugin {
 					const [bad_tasks_alerts, set_ids, set_titles] = collectBadTaskAlerts(facc, view_params);
 
 					console.log("bad_tasks_alerts: ", bad_tasks_alerts);
-					console.log (set_titles);
+					// console.log(set_ids);
+					// console.log(set_titles);
 
 
 					if (bad_tasks_alerts.length > 0) {
@@ -236,9 +244,18 @@ export default class MyPlugin extends Plugin {
 						for (let i=0; i < issues.length; i++) {
 							issueToTaskSync(issues[i], view_params, editor, facc, set_ids, set_titles);
 							iids.push("#" + issues[i].number); // index for taskToIssueSync
-						}
 
-						sortAndPruneTasksNote(editor, facc, view_params);
+							/* to be implemented
+							if (issues[i].cls.foreign_labels.length > 0) {
+								issueToForeignTaskSync(issues[i], view_params, editor, facc, set_ids, set_titles);
+							}
+							*/
+						}
+						console.log("facc after load/parse/sort/issueToTaskSync");
+						console.log(structuredClone(facc));
+						sortAndPruneTasksNote( editor, facc, view_params);
+						// console.log("facc after load/parse/sort/issueToTaskSync/sort");
+						// console.log(structuredClone(facc));
 
 						for (let f=0; f < facc.length; f++) {
 							if (!facc[f].hidden) {
@@ -251,6 +268,10 @@ export default class MyPlugin extends Plugin {
 								}
 							}
 						}
+
+						console.log("facc after load/parse/sort/issueToTaskSync/sort/taskToIssueSync");
+						console.log(structuredClone(facc));
+
 						if (bad_tasks_alerts.length > 0) {
 							const bt = 'The synchronisation from Obsidian to GitHub failed (at least partially). Please check the following findings.';
 							createBadTaskAlert(el, bt);

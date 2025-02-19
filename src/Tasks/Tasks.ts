@@ -167,7 +167,7 @@ function taskSortKey(title: string, cts: ClassTokens ): string {
 
 function pushTaskDescription(this_feature: string, this_task:string, tacc: Task[], line:string) {
     if (this_task.length > 0) {
-        tacc[tacc.length-1].description += "\n".concat(line);
+        tacc[tacc.length-1].description = (tacc[tacc.length-1].description + "\n").concat(line);
     }
 }
 
@@ -256,6 +256,7 @@ function finishFeature(this_feature: string, this_task: string, facc: Feature[],
             [this_feature, this_task] = finishTask(this_feature, this_task, tacc, i);
         }
         facc[facc.length - 1].tasks = tacc;
+        // console.log("Completed Feature: ", facc.length-1, facc[facc.length-1]);
         tacc = [];
     } else {
         console.log("Tag not matching in finishFeature()");
@@ -270,14 +271,15 @@ function startNewFeature(this_feature: string, this_task: string, facc: Feature[
     const words = line.split(" ");
     this_feature = words[1];
     facc.push(new Feature(i, 0, this_feature, false, []));
+    // console.log("New Feature: ", facc.length-1, facc[facc.length-1]);
     return [this_feature, ""];
 }
 
-export function parseTaskNote(editor: Editor, view_params: IssueViewParams): Feature[] {
-    let facc: Feature[] = [];
+export function parseTaskNote(editor: Editor, view_params: IssueViewParams, facc: Feature[]): Feature[] {
     let tacc: Task[] = [];
     let this_feature = "";
     let this_task = "";
+    facc = [];
     console.log("EditorLineCount: ", editor.lineCount());
     for (let i = 0; i < editor.lineCount(); i++) {
         let line = editor.getLine(i);
@@ -305,52 +307,49 @@ export function parseTaskNote(editor: Editor, view_params: IssueViewParams): Fea
     if (this_feature.length > 0) {
         [this_feature, this_task] = finishFeature(this_feature, this_task, facc, tacc, editor.lineCount());
     }
-    console.log(facc);
-    sortAndPruneTasksNote(editor, facc, view_params);
-    console.log(facc);
     return facc;
 }
 
-export function sortAndPruneTasksNote( editor: Editor, facc: Feature[], view_params: IssueViewParams) {
-    let compression = 0;
+export function sortAndPruneTasksNote(editor: Editor, facc: Feature[], view_params: IssueViewParams) {
+
+    let line_shift = 0;
     for (let f = 0; f < facc.length; f++) {
-        if ((!facc[f].hidden) && (facc[f].tasks.length > 0)) {
-            // sort tasks within this feature and remove empty lines
-            let acc = "";
-            let r_start = facc[f].tasks[0].start + compression; // tasks to be sorted start here
-            let r_end = facc[f].end + compression;     // replace text up to the end of the task
-            let idx = r_start;  // start index for next task
-            facc[f].start += compression;
-            facc[f].tasks.sort((t1, t2) => {
-                if (t1.sort_string > t2.sort_string) {
-                    return 1;
-                }
-                if (t1.sort_string < t2.sort_string) {
-                    return -1;
-                }
-                return 0;
-            });
-            for (let t = 0; t < facc[f].tasks.length; t++) {
-                // loop through sorted tasks
-                // trim descriptions and correct line numbers
-                // accumulate replacement text
-                facc[f].tasks[t].start = idx;
-                let new_desc = cleanTaskDescription(facc[f].tasks[t].description);
-                if (t == facc[f].tasks.length -1) {
-                    facc[f].tasks[t].description = new_desc;
-                } else if (facc[f].tasks[t+1].title != facc[f].tasks[t].title) {
-                    facc[f].tasks[t].description = new_desc + "\n";
-                };
-                facc[f].tasks[t].end = idx + facc[f].tasks[t].description.split("\n").length;
-                idx = facc[f].tasks[t].end;
-                acc = acc + renderTask(facc[f].tasks[t], view_params) + facc[f].tasks[t].description + "\n";
+        // sort tasks within this feature and remove empty lines
+        let acc = "";
+        let r_start = facc[f].end + line_shift;  // for features without tasks 
+        if (facc[f].tasks.length > 0) {
+            r_start = facc[f].tasks[0].start + line_shift; // tasks to be sorted start here
+        };
+        let r_end = facc[f].end + line_shift;     // replace text up to the end of the feature
+        let idx = r_start;  // start index for next task
+        facc[f].start = facc[f].start + line_shift;
+        facc[f].tasks.sort((t1, t2) => {
+            if (t1.sort_string > t2.sort_string) {
+                return 1;
+            }
+            if (t1.sort_string < t2.sort_string) {
+                return -1;
+            }
+            return 0;
+        });
+        for (let t = 0; t < facc[f].tasks.length; t++) {
+            // loop through sorted tasks
+            // trim descriptions and correct line numbers
+            // accumulate replacement text
+            facc[f].tasks[t].start = idx;
+            let new_desc = cleanTaskDescription(facc[f].tasks[t].description);
+            if (t == facc[f].tasks.length -1) {
+                facc[f].tasks[t].description = new_desc;
+            } else if (facc[f].tasks[t+1].title != facc[f].tasks[t].title) {
+                facc[f].tasks[t].description = new_desc + "\n";
             };
-            compression = compression + idx - r_end; // correct feature.end and following features with this
-            console.log("New compression: ", compression);
-            facc[f].end += compression;
-            console.log(acc);
-            editor.replaceRange(acc, {line: r_start, ch: 0}, {line: r_end, ch: 0});
-        }
+            facc[f].tasks[t].end = idx + facc[f].tasks[t].description.split("\n").length;
+            idx = facc[f].tasks[t].end;
+            acc = acc + renderTask(facc[f].tasks[t], view_params) + facc[f].tasks[t].description + "\n";
+        };
+        facc[f].end = idx;
+        line_shift = line_shift + idx - r_end; // correct feature.end and following features with this
+        editor.replaceRange(acc, {line: r_start, ch: 0}, {line: r_end, ch: 0});
     }
 }
 
@@ -406,8 +405,6 @@ export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewPara
         })
     })
 
-    // console.log("All ID Set: " , set_ids);
-    
     return [bad_task_alerts, set_ids, set_titles] ;
 }
 
@@ -419,15 +416,15 @@ function renderTask(task: Task, view_params: IssueViewParams): string {
             task.cts.iid_tokens).concat(     
             task.cts.tid_tokens).concat(     
             task.cts.priority_tokens).concat(
-            task.cts.other_tokens).join(" ");        // .map(iid => shortIidToken(iid))
+            task.cts.other_tokens).join(" ");
     // console.log("renderTask: ", res);
     return res;
 }
 
 function statusCodeFromAssignee( assignee: string ): string {
-    // console.log( "Assignee to be inserted: ", a);
     // simple hack which supports 25 contributors but their GitHub login must start with different letters
     // need to peel out the user name from the task plugin configuration where the custom task states are named
+    // console.log( "Assignee to be inserted: ", a);
     if (assignee != undefined) {
         if (assignee.length > 0){
             return assignee.slice(0,1).toLowerCase();
@@ -437,6 +434,13 @@ function statusCodeFromAssignee( assignee: string ): string {
     } else {
         return " ";
     }
+}
+
+export function issueToForeignTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], set_ids: Set<string>, set_titles: Set<string>) {
+    // search for foreign tasks with this title and product combination
+    // if it does not exist, add the task without issue id.
+
+    // to be implemented 
 }
 
 export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], set_ids: Set<string>, set_titles: Set<string>) {
@@ -520,95 +524,47 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
         } else {   
             // no task with this id exists, we assume that it was created on GitHub and
             // insert it into the ReleasesNote under its feature (if that exists there)
-            let f_insert = -1;    // point to feature where task is to be inserted
-            let t_insert = -1;    // point to task where it is to be inserted
             let t_start = -1;     // editor line number where task is to be inserted
             for (let f = 0; f < facc.length; f++) {
-                if (facc[f].tag == i_feature) {   
-                    // feature found
-                    const sorted_tasks = facc[f].tasks.sort((t1, t2) => {
-                        if (t1.sort_string > t2.sort_string) {
-                            return 1;
-                        }
-                        if (t1.sort_string < t2.sort_string) {
-                            return -1;
-                        }
-                        return 0;
+                if ((t_start == -1) && (facc[f].tag == i_feature)) { 
+                    // feature found and task not already inserted
+                    t_start = facc[f].end; // new task goes to the end of the feature;
+                    // Create task properties from the issue object. 
+                    const status_code = statusCodeFromAssignee(issue.assignee);
+                    const mapped_tokens: string[] = []; // 
+                    issue.cls.feature_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
+                    issue.cls.product_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
+                    issue.cls.iid_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
+                    issue.cls.priority_labels.forEach(label => mapped_tokens.push(prioTokenFromLabel(label)));
+
+                    // console.log("Inserting Issue with these mapped_tokens: ", mapped_tokens);
+                    
+                    const cts = new ClassTokens(mapped_tokens, view_params); 
+                    const sort_string = taskSortKey(issue.title, cts);
+                    const new_task = new Task(t_start, t_start+1, issue.title, "", cts, sort_string, status_code);
+                    const new_text = renderTask(new_task, view_params) + "\n";                    
+                    editor.replaceRange(new_text, { line: t_start, ch: 0 }, { line: t_start, ch: 0 });
+                    new Notice("Inserting new " + i_feature + " task from issue #" + issue.number );
+                    // console.log("Inserting new " + i_feature + " task from issue #" + issue.number + " @" + t_start);
+                    new_task.cts.tid_tokens.forEach((token) => {set_ids.add(token)});
+                    new_task.cts.iid_tokens.forEach((token) => {set_ids.add(token)});
+                    new_task.cts.product_tokens.forEach((token) => {set_titles.add(issue.title + " " + token)});
+                    facc[f].tasks.push(new_task);
+                    facc[f].end = facc[f].end + 1;
+
+                    // console.log(i_feature + " starts at " + facc[f].start + " " + facc[f].end + " length " + facc[f].tasks.length);
+                    
+                } else if (t_start >= 0) {
+                    // We inserted a task to the end of a previous feature and we need to correct
+                    // the facc line number indexing so that we can use it for the next issue.
+                    facc[f].start = facc[f].start + 1;
+                    facc[f].end = facc[f].end + 1;
+                    facc[f].tasks.forEach((task) => {
+                        task.start = task.start + 1;
+                        task.end = task.end + 1;
                     });
-                    const i_sort_string = issueSortKey(issue.title, issue.cls, IssueSortOrder.feature);
-                    for (let t = 0; t < sorted_tasks.length; t++) {
-                        if (sorted_tasks[t].sort_string > i_sort_string) {   
-                            t_start = sorted_tasks[t].start; // insert before this line
-                            t_insert = t;  // new task gets this task index
-                            break;                    
-                        }
-                    }
-                    if (t_start == -1) {
-                        t_start = facc[f].end; // new task goes to the end of the feature;
-                        t_insert = facc[f].tasks.length;  // index of new task
-                    } else {
-                        for (let t = 0; t < facc[f].tasks.length; t++) {
-                            if (facc[f].tasks[t].start == t_start) {   
-                                t_insert = t;  // new task gets this task index
-                                break;                    
-                            }
-                        }    
-                    }
-                    // edit the ReleasesNote 
-                    f_insert = f;
-                    break;
                 }
-            }
-
-            if (f_insert > -1) {
-                // We want to insert a task. For that, we need to correct
-                // the facc line number indexing so that we can use it for the next issue.
-                // Create task properties from the issue object. 
-                const status_code = statusCodeFromAssignee(issue.assignee);
-                const mapped_tokens: string[] = []; // 
-                issue.cls.feature_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
-                issue.cls.product_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
-                issue.cls.iid_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
-                issue.cls.priority_labels.forEach(label => mapped_tokens.push(prioTokenFromLabel(label)));
-
-                // console.log("Inserting Issue with these mapped_tokens: ", mapped_tokens);
-                
-                const cts = new ClassTokens(mapped_tokens, view_params); 
-                const sort_string = taskSortKey(issue.title, cts);
-                const new_task = new Task(t_start, t_start+1, issue.title, "", cts, sort_string, status_code);
-                editor.replaceRange(renderTask(new_task, view_params) + "\n", { line: t_start, ch: 0 }, { line: t_start + 1, ch: 0 });
-                new Notice("Inserting new task from issue #" + issue.number);
-                console.log("Inserting new task from issue #" + issue.number);
-                new_task.cts.tid_tokens.forEach((token) => {set_ids.add(token)});
-                new_task.cts.iid_tokens.forEach((token) => {set_ids.add(token)});
-                new_task.cts.product_tokens.forEach((token) => {set_titles.add(issue.title + " " + token)});
-                facc[f_insert].tasks.splice(t_insert, 0, new_task);
-                for (let f = 0; f < facc.length; f++) {
-                    if (f == f_insert) {
-                        for (let t = t_insert+1; t < facc[f].tasks.length; t++) {
-                            facc[f].tasks[t].start += 1;
-                            facc[f].tasks[t].end += 1;
-                        };
-                        facc[f].end += 1;
-                    }
-                    if (f > f_insert){
-                        facc[f].start += 1;
-                        for (let t = 0; t < facc[f].tasks.length; t++) { 
-                            facc[f].tasks[t].start += 1;
-                            facc[f].tasks[t].end += 1;
-                        };
-                        facc[f].end += 1;
-                    }
-                }
-            }
-            
-            if (issue.cls.foreign_labels.length > 0) {
-                // check if we need to insert a task for a foreign repo
-                // we don't have an issue id for that and must search for
-                // title and foreign product token
-
-                // tbd
-            }
+            }            
         }
     }
 }
@@ -631,12 +587,13 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
         }
 
     } else if (task.status_code > " ") {
-        console.log(task.status_code.toLowerCase());
-
         // task may need to be created as an issue in repo
+
+        // console.log(task.status_code.toLowerCase());
+
         let assignees = logins.filter(l => l.startsWith(task.status_code.toLowerCase()));
 
-        console.log(assignees);
+        // console.log(assignees);
 
         if (assignees.length == 0) {
             
@@ -681,8 +638,7 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
                 } as SubmittableIssue
             );
 
-            console.log(new_issues);
-            console.log()
+            // console.log(new_issues);
 
             if (new_issues.length == 1) {
                 issues.push(new_issues[0]);

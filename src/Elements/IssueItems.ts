@@ -35,8 +35,13 @@ export class IssueItems {
 		const detailsContainer = details.createDiv();
 		detailsContainer.classList.add("issue-items-details-container");
 
+		let tid = "";
+		if (issue.cls.tid_labels.length > 0) {
+			tid = " " + issue.cls.tid_labels[0].name;
+		};
+
 		const creatorText = detailsContainer.createEl("span", {
-			text: `#${issue.number} opened ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`
+			text: `#${issue.number}${tid} opened ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`
 		});
 		creatorText.classList.add("issue-items-creator-text");
 
