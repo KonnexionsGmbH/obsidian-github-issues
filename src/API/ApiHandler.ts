@@ -252,6 +252,47 @@ export async function api_get_issues_by_id(octokit: Octokit, view_params: IssueV
 	return iss.filter(issue => issueIDs.includes(issue.number));
 }
 
+export async function api_get_issue_by_number(octokit: Octokit, view_params: IssueViewParams, issue_num: number) {
+	// can fetch a closed issue too
+
+	if (view_params.repo == null) return;
+
+	console.log(issue_num);
+	const res = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}', {
+		owner: view_params.owner,
+		repo: view_params.repo,
+		issue_number: issue_num,
+		headers: {
+			'X-GitHub-Api-Version': '2022-11-28'
+		}
+	})
+
+	if (res.status == 200) {
+		return {
+			title: res.data.title,
+			body: res.data.body,
+			labels: res.data.labels.map((label: any) => {
+				return {
+					name: label.name ?? "",
+					color: label.color ?? ""
+				}
+			}),
+			state: res.data.state,
+			avatar_url: res.data.user?.avatar_url,
+			updated_at: res.data.updated_at,
+			assignee: {
+				avatar_url: res.data.assignee?.avatar_url,
+				login: res.data.assignee?.login
+			} as Assignee,
+			
+			comments: res.data.comments
+		} as RepoDetails;
+	} else {
+		return null;
+	}
+}
+
+
 export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
 	if (issue.view_params.repo == null) return;
 

@@ -1,8 +1,7 @@
-import { ClassLabels, Issue, IssueSortOrder, issueSortKey, prioFromName, allProperLabels } from "../Issues/Issue";
-import { Label, SubmittableIssue, api_submit_issue } from "../API/ApiHandler";
+import { Issue, prioFromName, issueNumber } from "../Issues/Issue";
+import { Label, SubmittableIssue, api_submit_issue, api_get_issue_by_number } from "../API/ApiHandler";
 import { Editor, Notice } from "obsidian";
 import { IssueViewParams } from "../main";
-import { createBadTaskAlert } from "../Elements/IssueItems";
 import { Octokit } from "@octokit/core";
 
 /**
@@ -483,7 +482,11 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                                 issue.description = "synced to task " + t_task.cts.tid_tokens[0] + "\n" + issue.description;
                                 findings.push("Proposing to add a task ID link to issue description.");
                             } else if ( !t_task.cts.tid_tokens.length && issue.cls.tid_labels.length ) {
-                                findings.push("Task has no ID but a link exists in issue description.");
+                                if (set_ids.has(issue.cls.tid_labels[0].name)) {
+                                    findings.push("Expected task ID exists on another task. We have an ID mismatch!");
+                                } else {
+                                    findings.push("Task has no task ID but a link exists in issue description. The ID may have been lost on the task and can be restored manually.");
+                                };
                             } else if ( t_task.cts.tid_tokens[0] != issue.cls.tid_labels[0].name ){ 
                                 findings.push('Task ID does not match the link in issue description.');
                             };
@@ -583,7 +586,25 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
         } else if (status_obsolete.includes(task.status_code)) {
             // issue is closed or cancelled, ok 
         } else {
-            bad_tasks_alerts.push([task.cts.feature_tokens[0], "/", task.title,"/"].concat(task.cts.iid_tokens[0]).concat(["should have an open issue"]).join(" "));
+            const details = await api_get_issue_by_number(octokit, view_params, issueNumber(task.cts.iid_tokens[0]));
+            if (details) {
+                if (details.state == "closed") {
+                    editor.setSelection({ line: task.start, ch: 0 }, { line: task.start+1, ch: 0 });
+                    if (editor.getSelection().startsWith(renderTask(task,view_params))) {
+                        task.status_code = "x";
+                        editor.replaceSelection(renderTask(task,view_params) + "\n");
+                        const message = [task.cts.feature_tokens[0], task.cts.iid_tokens[0], "closed in repo"].join(" ");
+                        new Notice(message);
+                        console.log(message);
+                    } else {
+                        bad_tasks_alerts.push([task.cts.feature_tokens[0],"/",task.title,"/",task.cts.iid_tokens[0],"was closed in repo. Please check!"].join(" "));    
+                    }
+                } else {
+                    bad_tasks_alerts.push([task.cts.feature_tokens[0],"/",task.title,"/",task.cts.iid_tokens[0],"should have an open issue"].join(" "));
+                }
+            } else {
+                bad_tasks_alerts.push([task.cts.feature_tokens[0],"/",task.title,"/",task.cts.iid_tokens[0],"not found in repo"].join(" "));
+            }
         }
 
     } else if (task.status_code > " ") {

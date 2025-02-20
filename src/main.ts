@@ -12,7 +12,7 @@ import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
 import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
 import { Issue, ClassLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
-import { Feature, Task, parseTaskNote, collectBadTaskAlerts, sortAndPruneTasksNote, issueToTaskSync, issueToForeignTaskSync, taskToIssueSync } from "./Tasks/Tasks";
+import { Feature, parseTaskNote, collectBadTaskAlerts, sortAndPruneTasksNote, issueToTaskSync, issueToForeignTaskSync, taskToIssueSync } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
 import { reRenderView } from "./Utils/Utils";
 
@@ -169,16 +169,13 @@ export default class MyPlugin extends Plugin {
 				let editor: Editor;
 				let facc: Feature[] = [];
 				this.app.workspace.iterateRootLeaves((leaf) => {
-					if ((leaf.getDisplayText() == "IO-XPA Releases") && (leaf.getViewState().type == "markdown")) {
-						this.app.workspace.setActiveLeaf(leaf, { focus: false });
+					if ((leaf.getDisplayText() == view_params.file_name) && (leaf.getViewState().type == "markdown")) {
+						this.app.workspace.setActiveLeaf(leaf, { focus: true });
 						if (leaf.view) {							
-							editor = leaf.view.editor;		// compiler sees a problem here but it works
+							editor = leaf.view.editor;  // VSCode sees a problem here but it works
 							facc = parseTaskNote(editor, view_params, facc);
 							console.log("facc after load/parse");
 							console.log(structuredClone(facc));
-						    // sortAndPruneTasksNote(editor, facc, view_params);
-							// console.log("facc after load/parse/sort");
-							// console.log(structuredClone(facc));
 						}
 					}
 				})
@@ -251,11 +248,9 @@ export default class MyPlugin extends Plugin {
 							}
 							*/
 						}
-						console.log("facc after load/parse/sort/issueToTaskSync");
-						console.log(structuredClone(facc));
 						sortAndPruneTasksNote( editor, facc, view_params);
-						// console.log("facc after load/parse/sort/issueToTaskSync/sort");
-						// console.log(structuredClone(facc));
+						console.log("facc after issueToTaskSync/sort");
+						console.log(structuredClone(facc));
 
 						for (let f=0; f < facc.length; f++) {
 							if (!facc[f].hidden) {
@@ -269,7 +264,7 @@ export default class MyPlugin extends Plugin {
 							}
 						}
 
-						console.log("facc after load/parse/sort/issueToTaskSync/sort/taskToIssueSync");
+						console.log("facc after taskToIssueSync");
 						console.log(structuredClone(facc));
 
 						if (bad_tasks_alerts.length > 0) {

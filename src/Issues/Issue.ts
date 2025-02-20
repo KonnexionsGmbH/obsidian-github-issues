@@ -1,9 +1,9 @@
-import { Editor } from "obsidian";
 import { Label } from "../API/ApiHandler";
 import { IssueViewParams} from "../main";
 
 export enum IssueSortOrder {
 	feature = "Feature, Title, ...",
+	findings = "Findings, Feature, ...",
 	title = "Title, Product, ...",
 	idDesc = "Issue ID desc",
 	idAsc = "Issue ID asc"
@@ -15,6 +15,10 @@ export enum IssueSortOrder {
 export function longName(name:string): string {
 	let id:number = +name.substring(1);
 	return "#"+ ("000000" + id).slice(-6);
+}
+
+export function issueNumber(name:string): number {
+	return +name.substring(1)
 }
 
 export function prioFromName(name: string): number {
@@ -138,7 +142,7 @@ export class Issue {
 /*
  * Constructs a string which can be used to sort issues by features then issue title then products
  */
-export function issueSortKey(title: string, tl: ClassLabels, sort_order: IssueSortOrder ): string {
+export function issueSortKey(title: string, tl: ClassLabels, findings: string[], sort_order: IssueSortOrder ): string {
 	const res: string[] = [];
 	switch  (sort_order) {
 		case IssueSortOrder.feature: {
@@ -183,13 +187,25 @@ export function issueSortKey(title: string, tl: ClassLabels, sort_order: IssueSo
 			});
 			break;
 		};
+		case IssueSortOrder.findings: {
+			if (findings.length == 0) {
+				res.push("none");
+			} else {
+				res.push("findings");
+			};
+			if (tl.feature_labels.length > 0) {
+				res.push(tl.feature_labels[0].name);
+			};
+			res.push(title);
+			break;
+		};		
 	}
 	return res.join();
 }
 
 export function sortIssues(issues: Issue[], sort_order: IssueSortOrder) {
 	issues.forEach((issue) => {
-		issue.sort_string = issueSortKey(issue.title, issue.cls, sort_order);
+		issue.sort_string = issueSortKey(issue.title, issue.cls, issue.findings, sort_order);
 		// console.log("issue_sort_string: ", issue.sort_string);
 	});
 

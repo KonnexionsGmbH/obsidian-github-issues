@@ -98,21 +98,26 @@ export class IssueItems {
 	private static async reloadIssue(container: HTMLElement, parent: HTMLElement, issue: Issue, ocotokit: Octokit, app: App) {
 		const updatedIssueDetail = await api_get_issue_details(ocotokit, issue);
 		if (updatedIssueDetail) {
-			issue.title = updatedIssueDetail.title;
-			issue.description = updatedIssueDetail.body;
-			// labels are updated on the issue object directly as the changes are not reflected in the issue object (from server) immediately
-			const titleEl = container.querySelector('.issue-items-title');
-			if (titleEl) {
-				titleEl.textContent = issue.title;
-				const labelContainer = titleEl.createDiv({ cls: "issue-items-label-container" });
+			if (updatedIssueDetail.state == "closed") {
+				console.log("removing #" + issue.number + " visibility in issue list");
+				container.empty();
+			} else {
+				issue.title = updatedIssueDetail.title;
+				issue.description = updatedIssueDetail.body;
+				// labels are updated on the issue object directly as the changes are not reflected in the issue object (from server) immediately
+				const titleEl = container.querySelector('.issue-items-title');
+				if (titleEl) {
+					titleEl.textContent = issue.title;
+					const labelContainer = titleEl.createDiv({ cls: "issue-items-label-container" });
 
-				allProperLabels(issue.cls).forEach((label) => {
-					const labelEl = labelContainer.createDiv({ cls: "issue-items-label" });
-					labelEl.style.backgroundColor = `#${label.color}`;
-					labelEl.style.color = getTextColor(label.color);
-					labelEl.innerText = label.name;
-					labelEl.classList.add("issue-items-label");
-				});
+					allProperLabels(issue.cls).forEach((label) => {
+						const labelEl = labelContainer.createDiv({ cls: "issue-items-label" });
+						labelEl.style.backgroundColor = `#${label.color}`;
+						labelEl.style.color = getTextColor(label.color);
+						labelEl.innerText = label.name;
+						labelEl.classList.add("issue-items-label");
+					});
+				}
 			}
 		}
 	}

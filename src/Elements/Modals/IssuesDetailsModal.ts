@@ -352,7 +352,7 @@ export class IssuesDetailsModal extends Modal {
 			const updated = await api_comment_on_issue(this.octokit, this.issue, commentsInput.value);
 			if (updated) {
 				new Notice("Comment posted");
-				this.close();
+				// this.close();
 			}
 		}
 
@@ -362,7 +362,7 @@ export class IssuesDetailsModal extends Modal {
 			});
 
 			if (updated) {
-				reRenderView(this.app);
+				// reRenderView(this.app);
 				this.close();
 				new Notice("Issue closed");
 			} else {
