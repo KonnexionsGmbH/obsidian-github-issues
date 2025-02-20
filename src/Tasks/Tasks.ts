@@ -445,7 +445,7 @@ export function issueToForeignTaskSync(issue: Issue, view_params:IssueViewParams
 export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], set_ids: Set<string>, set_titles: Set<string>) {
     
     const tid_token = "🆔";
-    
+
     if (issue.cls.feature_labels.length > 1) {
         issue.findings.push('Issue cannot have more than one feature label');
     } else if (issue.cls.feature_labels.length == 0) {

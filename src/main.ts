@@ -4,14 +4,15 @@ import {
 	api_get_own_issues,
 	api_get_labels,
 	Label,
-	api_create_new_label
+	api_create_new_label,
+	api_set_labels_on_issue
 } from "./API/ApiHandler";
 import { IssuesModal } from "./Elements/Modals/IssuesModal";
 import { Octokit } from "@octokit/core";
 import { updateIssues } from "./Issues/IssueUpdater";
 import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
 import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
-import { Issue, ClassLabels, IssueSortOrder, sortIssues } from "./Issues/Issue";
+import { Issue, ClassLabels, IssueSortOrder, sortIssues, allProperLabels } from "./Issues/Issue";
 import { Feature, parseTaskNote, collectBadTaskAlerts, sortAndPruneTasksNote, issueToTaskSync, issueToForeignTaskSync, taskToIssueSync } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
 import { reRenderView } from "./Utils/Utils";
@@ -223,6 +224,23 @@ export default class MyPlugin extends Plugin {
 						}
 					});
 
+					if (view_params.product_tokens.length == 1) {
+						// this repo has only one product, we can assume this product label for all issues
+						const product_color = repo_class_labels.product_labels.find(l => l.name == view_params.product_tokens[0])?.color;
+						for (let i = 0; i < issues.length; i++) {
+							if (issues[i].cls.product_labels.length == 0) {
+								issues[i].cls.product_labels.push({ name: view_params.product_tokens[0], color: product_color } as Label);
+								const selectedTokens = allProperLabels(issues[i].cls).map((label) => label.name) ;
+								const updated = await api_set_labels_on_issue(this.octokit, issues[i], selectedTokens);
+								if (updated) {
+									new Notice("Default label updated");
+								} else {
+									new Notice("Could not update default label");
+								}	
+							}
+						}					
+					}
+	
 					const [bad_tasks_alerts, set_ids, set_titles] = collectBadTaskAlerts(facc, view_params);
 
 					console.log("bad_tasks_alerts: ", bad_tasks_alerts);
