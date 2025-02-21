@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, Editor} from "obsidian";
+import { App, Notice, Plugin, PluginSettingTab, Setting, Editor, FileSystemAdapter} from "obsidian";
 import {
 	api_authenticate,
 	api_get_own_issues,
@@ -106,6 +106,22 @@ export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 	octokit: Octokit = new Octokit({ auth: "" });
 
+/*			
+	getAbsolutePath(fileName: string): string {
+		let basePath;
+		let relativePath;
+		// base path
+		if (this.app.vault.adapter instanceof FileSystemAdapter) {
+			basePath = this.app.vault.adapter.getBasePath();
+		} else {
+			throw new Error('Cannot determine base path.');
+		}
+		// relative path
+		relativePath = `${this.app.vault.configDir}/plugins/linked-data-vocabularies/${fileName}`;
+		// absolute path
+		return `${basePath}/${relativePath}`;
+	}
+*/
 	async onload() {
 
 		await this.loadSettings();
@@ -180,6 +196,16 @@ export default class MyPlugin extends Plugin {
 						}
 					}
 				})
+
+/*
+				const task_config_path = this.getAbsolutePath(".obsidian/plugins/obsidian-tasks-plugin/data.json");
+				console.log(task_config_path);
+		  
+				if (this.app.vault.adapter instanceof FileSystemAdapter) {
+				  let basePath = this.app.vault.adapter.getBasePath();
+				  console.log(basePath);
+				}
+*/			  
 
 				// let issues: Issue[] = await api_get_own_issues(this.octokit, view_params);
 				let issues: Issue[] = await openIssuesPromise;

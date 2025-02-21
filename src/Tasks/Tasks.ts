@@ -407,6 +407,24 @@ export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewPara
     return [bad_task_alerts, set_ids, set_titles] ;
 }
 
+export function generateUniqueId(existingIds: string[]) {
+    let id = '';
+    let keepGenerating = true;
+
+    while (keepGenerating) {
+        // from https://www.codemzy.com/blog/random-unique-id-javascript
+        id = Math.random()
+            .toString(36)
+            .substring(2, 6 + 2);
+
+        // if (!existingIds.includes(id)) {
+            keepGenerating = false;
+        // }
+    }
+    return id;
+}
+
+
 function renderTask(task: Task, view_params: IssueViewParams): string {
     const header = '- [' + task.status_code + '] ' + view_params.task_token;        
     const res = [header, task.title].concat(
@@ -441,6 +459,8 @@ export function issueToForeignTaskSync(issue: Issue, view_params:IssueViewParams
 
     // to be implemented 
 }
+
+
 
 export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], set_ids: Set<string>, set_titles: Set<string>) {
     
