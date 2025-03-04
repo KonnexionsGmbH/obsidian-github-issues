@@ -31,6 +31,7 @@ export class IssuesDetailsModal extends Modal {
 
 	async onOpen() {
 		const { contentEl } = this;
+		contentEl.classList.add("issue-details");
 
 		const titleInput = contentEl.createEl("textarea", { text: this.issue.title });
 		titleInput.classList.add("issue-details-title-input");
@@ -103,11 +104,11 @@ export class IssuesDetailsModal extends Modal {
 		const assignee = assignedContainer.createSpan({ text: assignee_text	});
 
 		const stateAndLabelsContainer = contentEl.createDiv();
-		stateAndLabelsContainer.classList.add("issue-details-state-and-label-container")
+		stateAndLabelsContainer.classList.add("issue-details-label-pill");
+		// stateAndLabelsContainer.classList.add("issue-details-state-and-label-container");
 
 		const statePill = stateAndLabelsContainer.createDiv();
-		statePill.classList.add("issue-details-state-pill")
-		//make it green if state is open
+		statePill.classList.add("issue-details-label-pill")
 		if (details?.state === "open") {
 			statePill.style.backgroundColor = "rgba(31, 118, 41, 0.5)";
 		} else {
@@ -115,7 +116,7 @@ export class IssuesDetailsModal extends Modal {
 		}
 
 		const state = statePill.createEl("span", { text: details?.state });
-		state.classList.add("issue-details-state")
+		state.classList.add("issue-details-label-name");
 
 		const labels = stateAndLabelsContainer.createDiv();
 		labels.classList.add("issue-details-labels")
@@ -138,6 +139,9 @@ export class IssuesDetailsModal extends Modal {
 			labelName.classList.add("issue-details-label-name")
 			labelName.style.color = getTextColor(label.color);
 		}
+
+		const foldLabelsButton = stateAndLabelsContainer.createEl("button", { text: ">" });
+		foldLabelsButton.classList.add("issue-labels-fold-button");
 
 		const labelsGrid = contentEl.createDiv();
 		labelsGrid.classList.add("issue-details-labels-grid");
@@ -178,6 +182,19 @@ export class IssuesDetailsModal extends Modal {
 				checkbox.addEventListener("change", checkForChanges);
 			});
 
+
+			foldLabelsButton.onclick = async () => {
+				if (foldLabelsButton.textContent == ">") {
+					foldLabelsButton.textContent = "v";
+					labelsGrid.style.display = "block"
+				} else {
+					foldLabelsButton.textContent = ">";
+					labelsGrid.style.display = "none"
+				}
+			}
+	
+			labelsGrid.style.display = "none";
+
 			saveLabelsButton.onclick = async () => {
 				const labels = [...allLabels.feature_labels, 
 								...allLabels.priority_labels,
@@ -203,20 +220,16 @@ export class IssuesDetailsModal extends Modal {
 		const descriptionContainer = contentEl.createDiv();
 		descriptionContainer.classList.add("issue-details-description-container");
 
-		const headerContainer = descriptionContainer.createDiv();
-		headerContainer.classList.add("issue-details-author-container")
+		const descriptionHeader = descriptionContainer.createEl("span", { text: "Description:" });
 
-		const descriptionHeader = headerContainer.createEl("span", { text: "Description:" });
-		descriptionHeader.classList.add("issue-details-author-name")
-
-		const previewDiv = descriptionContainer.createDiv();
-		previewDiv.classList.add("issue-details-description-preview");
+		const descriptionPreview = descriptionContainer.createDiv();
+		descriptionPreview.classList.add("issue-details-description-preview");
 
 		// Initial markdown render
 		await MarkdownRenderer.render(
 			this.app,
 			details.body,
-			previewDiv,
+			descriptionPreview,
 			'',
 			new Component()
 		);
@@ -226,7 +239,7 @@ export class IssuesDetailsModal extends Modal {
 			textarea.style.height = `${textarea.scrollHeight}px`;
 		};
 
-		const descriptionInput = contentEl.createEl("textarea", { text: details.body });
+		const descriptionInput = descriptionContainer.createEl("textarea", { text: details.body });
 		descriptionInput.classList.add("issue-details-description-input");
 		descriptionInput.style.display = "none";
 
@@ -239,32 +252,25 @@ export class IssuesDetailsModal extends Modal {
 		});
 
 		// Switch to edit mode on preview click
-		previewDiv.addEventListener("click", () => {
-			previewDiv.style.display = "none";
+		descriptionPreview.addEventListener("click", () => {
+			descriptionPreview.style.display = "none";
 			descriptionInput.style.display = "block";
 			descriptionInput.focus();
 			autoResizeTextarea(descriptionInput);
 		});
 
-		// Switch to edit mode on preview click
-		previewDiv.addEventListener("click", () => {
-			previewDiv.style.display = "none";
-			descriptionInput.style.display = "block";
-			descriptionInput.focus();
-		});
-
 		// Switch back to preview on blur
 		descriptionInput.addEventListener("blur", async () => {
-			previewDiv.empty();
+			descriptionPreview.empty();
 			await MarkdownRenderer.render(
 				this.app,
 				descriptionInput.value,
-				previewDiv,
+				descriptionPreview,
 				'',
 				new Component()
 			);
 			descriptionInput.style.display = "none";
-			previewDiv.style.display = "block";
+			descriptionPreview.style.display = "block";
 		});
 
 		const saveDescriptionButton = contentEl.createEl("button", { text: "Save Description" });
@@ -308,36 +314,41 @@ export class IssuesDetailsModal extends Modal {
 
 			let header_text = comment?.login + " commented " + getPasteableTimeDelta(comment?.update_at);
 			const authorName = authorContainer.createEl("span", { text: header_text });
-			authorName.classList.add("issue-details-author-name")
 
-			const commentBody = commentsContainer.createDiv();
-			commentBody.classList.add("issue-details-comment-body")
+			const commentsBody = commentsContainer.createDiv();
+			commentsBody.classList.add("issue-details-comment-body")
 
-			const commentText = commentBody.createEl("span");
+			const commentsText = commentsBody.createEl("span");
 			MarkdownRenderer.render(
 				this.app,
 				comment?.body,
-				commentText,
+				commentsText,
 				'',
 				new Component()
 			);
-			commentText.classList.add("issue-details-comment-text")
-			commentText.classList.add("selectable-text");
+			commentsText.classList.add("issue-details-comments-text")
+			commentsText.classList.add("selectable-text");
 
 		});
 
-		const commentsInput = contentEl.createEl("textarea");
-		commentsInput.classList.add("issue-details-comments-input")
-		if (this.issue.findings.length > 0) {
-			commentsInput.setText(this.issue.findings.join("\n"));
-			commentsInput.classList.add("issue-findings")
-		};
-		
-		//set the label
-		const commentsInputLabel = contentEl.createEl("label", { text: "Write a comment" });
-		commentsInputLabel.classList.add("issue-details-comments-input-label")
-		commentsInputLabel.htmlFor = commentsInput.id;
+		const commentContainer = contentEl.createDiv();
+		commentContainer.classList.add("issue-details-comment-container")
 
+		const commentHeader = commentContainer.createEl("span", { text: "Write a comment:" });
+
+		const commentInput = commentContainer.createEl("textarea");
+		commentInput.classList.add("issue-details-comment-input")
+		if (this.issue.findings.length > 0) {
+			commentInput.setText(this.issue.findings.join("\n"));
+			commentInput.classList.add("issue-findings")
+		};
+
+		autoResizeTextarea(commentInput);
+
+		// Resize on input
+		commentInput.addEventListener("input", () => {
+			autoResizeTextarea(commentInput);
+		});
 
 		const buttonsContainer = contentEl.createDiv();
 		buttonsContainer.classList.add("issue-details-buttons-container")
@@ -348,11 +359,15 @@ export class IssuesDetailsModal extends Modal {
 		const closeButton = buttonsContainer.createEl("button", { text: "Close Issue" });
 		closeButton.classList.add("issue-details-close-button")
 
+		this.showButtonOnInputChange(commentInput, commentButton, "");
+
 		commentButton.onclick = async () => {
-			const updated = await api_comment_on_issue(this.octokit, this.issue, commentsInput.value);
+			const updated = await api_comment_on_issue(this.octokit, this.issue, commentInput.value);
 			if (updated) {
-				new Notice("Comment posted");
-				// this.close();
+				new Notice("Issue comment posted");
+				commentButton.classList.remove("visible");
+			} else {
+				new Notice("Could not post comment");
 			}
 		}
 
@@ -362,7 +377,6 @@ export class IssuesDetailsModal extends Modal {
 			});
 
 			if (updated) {
-				// reRenderView(this.app);
 				this.close();
 				new Notice("Issue closed");
 			} else {
@@ -374,7 +388,11 @@ export class IssuesDetailsModal extends Modal {
 
 	private showButtonOnInputChange(input: HTMLTextAreaElement, button: HTMLButtonElement, initialValue: string) {
 		input.addEventListener("input", () => {
-			if (input.value !== initialValue) {
+			if ( !(input.value) && !(initialValue) ) {
+				button.classList.remove("visible");
+			} else if (!(initialValue)) {
+				button.classList.add("visible");
+			} else if (input.value !== initialValue) {
 				button.classList.add("visible");
 			} else {
 				button.classList.remove("visible");
