@@ -130,7 +130,7 @@ export async function api_submit_issue(octokit: Octokit, view_params: IssueViewP
 				} as Label;
 			})
 			const description = res.data.body ?? "";
-			const tl = new ClassLabels(mapped_labels, view_params, res.data.number, description);
+			const tl = new ClassLabels(mapped_labels, view_params, res.data.number, "");
 			// console.log("Assignee login: ", issue.assignee?.login);
 			return [new Issue(
 				res.data.title,
@@ -228,6 +228,9 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 			const description = issue.body ?? "";
 			const tl = new ClassLabels(mapped_labels, view_params, issue.number, description);
 			// console.log("Assignee login: ", issue.assignee?.login);
+			if (tl.tid_labels.length > 1) {
+				console.log(tl);
+			}
 			issues.push(new Issue(
 				issue.title,
 				description,

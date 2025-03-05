@@ -480,12 +480,16 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
         
         // issue has one feature and at least one product label, maybe we can sync it with tasks
         const i_feature = issue.cls.feature_labels[0].name;  // issue has a feature label
-        const i_id = issue.cls.iid_labels[0].name;           // issue id 
+        const i_id = issue.cls.iid_labels[0].name;           // issue id
+        let t_id = "";
+        if (issue.cls.tid_labels.length == 1) {
+            t_id = issue.cls.tid_labels[0].name;       // task id
+        }
         let t_task: Task;
         let t_found = false;
         let f_found = false;
         if ( set_ids.has(i_id) ) {   
-            // task exists with id, find it in facc and check title, feature, assignee and labels
+            // task exists with i_id (and product), find it in facc and check title, feature, assignee and labels
             for (let f = 0; f < facc.length; f++) {
                 if (facc[f].tag == i_feature) {
                     // feature exists in TasksNote
@@ -537,9 +541,62 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                 new Notice(`Syncing issue ${i_id} to tasks had ${findings.length} findings.`);
                 issue.findings = findings;
             }
+        } else if (set_ids.has(t_id)) {
+            console.log(t_id);
+            // matching task Id exists but issue ID is not yet synced back
+            for (let f = 0; f < facc.length; f++) {
+                if (facc[f].tag == i_feature) {
+                    // feature exists in TasksNote
+                    // search for task under correct feature only
+                    f_found = true;
+                    for (let t = 0; t < facc[f].tasks.length; t++) {
+                        if (facc[f].tasks[t].cts.tid_tokens.some(token => token == t_id)) {
+                            // task has the t_id token
+                            t_task = facc[f].tasks[t];
+                            t_found = true;
+                            if (t_task.title != issue.title) {
+                                findings.push(`Task ${t_id} title does not match issue ${i_id} title.`);
+                            } else {
+                                // add the i_id token to the task
+                                editor.setSelection({ line: t_task.start, ch: 0 }, { line: t_task.start+1, ch: 0 });
+                                if (editor.getSelection().startsWith(renderTask(t_task,view_params))) {
+                                    t_task.cts.iid_tokens.push(i_id);
+                                    editor.replaceSelection(renderTask(t_task,view_params) + "\n");
+                                    t_task.cts.iid_tokens.forEach((token) => {set_ids.add(token)});
+                                    const message = [i_feature, i_id, `issue id updated in task ${t_id}` ].join(" ");
+                                    new Notice(message);
+                                    console.log(message);
+                                } else {
+                                    const message = [i_feature, i_id, `issue id could not be updated in task ${t_id}`].join(" ");
+                                    new Notice(message);
+                                    console.log(message);
+                                }
+                            };
+                            if (t_task.status_code.toLowerCase().trim() != issue.assignee.charAt(0).toLowerCase()) {
+                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignee ${issue.assignee}.`);
+                            };
+                            if (t_task.cts.product_tokens.join() != issue.cls.product_labels.map(label => label.name).join()) {
+                                findings.push("Task product tags don't match issue product labels.");
+                            };
+                            break;                    
+                        }
+                    }
+                    if (!t_found) {
+                        findings.push(`Task ${t_id} feature does not match issue ${i_id} feature (any more). Correct this manually!`);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            if (!f_found) {
+                issue.findings.push('The Issue has a feature label which is currently absent or hidden in tasks. Sync is paused for this issue.');
+            }
+            if (findings.length > 0) {
+                new Notice(`Syncing issue ${i_id} to tasks had ${findings.length} findings.`);
+                issue.findings = findings;
+            }
 
         } else if (issue.cls.product_labels.filter(label => set_titles.has(issue.title + " " + label.name)).length > 0) {
-
             // a matching task without iid token exists. this should not happen often and can be fixed manually
             issue.findings.push('This issue cannot be linked automatically with its task. Find it by title and product and assign the id manually.');
             new Notice(`Syncing issue ${i_id} to tasks had one finding.`);
@@ -667,7 +724,7 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
                 mapped_tokens.push(token);
             });
 
-            console.log(["New issue to be created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" "));
+            // console.log(["New issue to be created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" "));
             
             let new_issues: Issue[] = await api_submit_issue(
                 octokit,
@@ -679,15 +736,12 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
                 } as SubmittableIssue
             );
 
-            // console.log(new_issues);
-
             if (new_issues.length == 1) {
                 issues.push(new_issues[0]);
                 iids.push("#" + new_issues[0].number);
                 task.cts.iid_tokens.push(new_issues[0].cls.iid_labels[0].name);
-                editor.setCursor({ line: task.start, ch: 0 });
+                editor.setSelection({ line: task.start, ch: 0 }, { line: task.start+1, ch: 0 });
                 const new_task = renderTask(task, view_params) + "\n";
-                console.log(new_task);
                 editor.replaceSelection(renderTask(task, view_params) + "\n");
                 const message = ["New issue created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" ");
                 new Notice (message);

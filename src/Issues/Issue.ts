@@ -65,8 +65,9 @@ export class ClassLabels {
 		
 		if (description != undefined) {
 			if (description.contains(tid_token)) {
-				const words = description.slice(description.indexOf(tid_token), 20).concat(" *").split(" ");
-				sorted_labels.push({name: words[0] + " " + words[1], color: "ffffff"} as Label);
+				const pos1 = description.indexOf(tid_token);
+				const tid = description.slice(pos1, pos1+9);
+				sorted_labels.push({name: tid.trim(), color: "ffffff"} as Label);
 			}
 		}
 
@@ -76,7 +77,9 @@ export class ClassLabels {
 			} else if (fts.some( token => token == label.name )) {
 				this.foreign_labels.push(label);
 			} else if ( label.name.startsWith(tid_token) ) {
-				this.tid_labels.push(label)
+				if (this.tid_labels.length ==0){
+					this.tid_labels.push(label)
+				}
 			} else if ( label.name.startsWith("p_") ) {
 				this.priority_labels.push(label)
 			} else if (label.name.startsWith("#")) {

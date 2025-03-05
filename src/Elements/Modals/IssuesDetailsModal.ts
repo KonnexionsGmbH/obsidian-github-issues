@@ -105,7 +105,6 @@ export class IssuesDetailsModal extends Modal {
 
 		const stateAndLabelsContainer = contentEl.createDiv();
 		stateAndLabelsContainer.classList.add("issue-details-label-pill");
-		// stateAndLabelsContainer.classList.add("issue-details-state-and-label-container");
 
 		const statePill = stateAndLabelsContainer.createDiv();
 		statePill.classList.add("issue-details-label-pill")

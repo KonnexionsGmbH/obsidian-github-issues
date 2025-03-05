@@ -59,7 +59,6 @@ export class IssueItems {
 			labelEl.style.backgroundColor = `#${label.color}`;
 			labelEl.style.color = getTextColor(label.color);
 			labelEl.innerText = label.name;
-			labelEl.classList.add("issue-items-label");
 		});
 
 		container.addEventListener("mouseenter", () => {

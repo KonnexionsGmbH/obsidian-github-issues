@@ -207,7 +207,6 @@ export default class MyPlugin extends Plugin {
 				}
 */			  
 
-				// let issues: Issue[] = await api_get_own_issues(this.octokit, view_params);
 				let issues: Issue[] = await openIssuesPromise;
 				
 				open_issue_count = issues.length;
@@ -273,7 +272,6 @@ export default class MyPlugin extends Plugin {
 					// console.log(set_ids);
 					// console.log(set_titles);
 
-
 					if (bad_tasks_alerts.length > 0) {
 						const bt = `The synchronisation from GitHub to Obsidian has been aborted because of below mentioned consistency errors in ${view_params.file_name}.
 						Please correct those. The GitHub Issues list which follows may help you with that.`;
@@ -295,7 +293,7 @@ export default class MyPlugin extends Plugin {
 						sortAndPruneTasksNote( editor, facc, view_params);
 						console.log("facc after issueToTaskSync/sort");
 						console.log(structuredClone(facc));
-
+/*
 						for (let f=0; f < facc.length; f++) {
 							if (!facc[f].hidden) {
 								for (let t = 0; t < facc[f].tasks.length; t++) {
@@ -310,7 +308,7 @@ export default class MyPlugin extends Plugin {
 
 						console.log("facc after taskToIssueSync");
 						console.log(structuredClone(facc));
-
+*/
 						if (bad_tasks_alerts.length > 0) {
 							const bt = 'The synchronisation from Obsidian to GitHub failed (at least partially). Please check the following findings.';
 							createBadTaskAlert(el, bt);
