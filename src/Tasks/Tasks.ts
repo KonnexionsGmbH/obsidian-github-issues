@@ -407,19 +407,19 @@ export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewPara
     return [bad_task_alerts, set_ids, set_titles] ;
 }
 
-export function generateUniqueId(existingIds: string[]) {
+export function generateUniqueId(existingIds: Set<string>) {
+    const tid_token = "🆔";		    // task ID
     let id = '';
     let keepGenerating = true;
 
     while (keepGenerating) {
-        // from https://www.codemzy.com/blog/random-unique-id-javascript
-        id = Math.random()
-            .toString(36)
-            .substring(2, 6 + 2);
 
-        // if (!existingIds.includes(id)) {
+        // from https://www.codemzy.com/blog/random-unique-id-javascript
+        id = tid_token + " " + Math.random().toString(36).substring(2, 6 + 2);
+
+        if (!existingIds.has(id)) {
             keepGenerating = false;
-        // }
+        }
     }
     return id;
 }
@@ -453,7 +453,8 @@ function statusCodeFromAssignee( assignee: string ): string {
     }
 }
 
-export function issueToForeignTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], set_ids: Set<string>, set_titles: Set<string>) {
+export function issueToForeignTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], 
+        set_ids: Set<string>, set_titles: Set<string>) {
     // search for foreign tasks with this title and product combination
     // if it does not exist, add the task without issue id.
 
@@ -462,7 +463,8 @@ export function issueToForeignTaskSync(issue: Issue, view_params:IssueViewParams
 
 
 
-export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], set_ids: Set<string>, set_titles: Set<string>) {
+export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], 
+        set_ids: Set<string>, set_titles: Set<string>) {
     
     const tid_token = "🆔";
 
@@ -649,7 +651,9 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
     }
 }
 
-export async function taskToIssueSync(task: Task, octokit: Octokit, view_params: IssueViewParams, editor: Editor, issues: Issue[], iids: string[], bad_tasks_alerts: string[], user: string) {
+export async function taskToIssueSync(task: Task, octokit: Octokit, view_params: IssueViewParams, 
+        editor: Editor, issues: Issue[], iids: string[], bad_tasks_alerts: string[], 
+        user: string, set_ids: Set<string>) {
 
     const status_obsolete = "xX-";
 
@@ -687,42 +691,46 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
     } else if (task.status_code > " ") {
         // task may need to be created as an issue in repo
 
-        // console.log(task.status_code.toLowerCase());
-
         let assignees = logins.filter(l => l.startsWith(task.status_code.toLowerCase()));
 
         // console.log(assignees);
 
-        if (assignees.length == 0) {
-            
+        if (assignees.length == 0) {           
             const message = "Cannot determine assignee from status code [" + task.status_code + "]";
             new Notice (message);
             console.log(message);
-
         } else {
-
-            let description = task.description;
-            if (task.cts.tid_tokens.length == 1) {
-                description = "synced from task " + task.cts.tid_tokens[0] + "\n" + description;
-            };
-            
+            let description = "" + task.description;
             const mapped_tokens: string[] = [];
-
             task.cts.feature_tokens.forEach((token) => {
                 mapped_tokens.push(token);
             });
-            
             task.cts.priority_tokens.forEach((token) => {
                 mapped_tokens.push(prioNameFromToken(token));
             });
-            
             task.cts.product_tokens.forEach((token) => { 
                 mapped_tokens.push(token);
             });
-
-            task.cts.tid_tokens.forEach((token) => { 
-                mapped_tokens.push(token);
-            });
+            if (task.cts.tid_tokens.length == 0) {
+                // add the t_id token to the task
+                editor.setSelection({ line: task.start, ch: 0 }, { line: task.start+1, ch: 0 });
+                if (editor.getSelection().startsWith(renderTask(task,view_params))) {
+                    task.cts.tid_tokens.push(generateUniqueId(set_ids));
+                    description = "synced from task " + task.cts.tid_tokens[0] + "\n" + task.description;
+                    editor.replaceSelection(renderTask(task,view_params) + "\n");
+                    const message = [`Task for new issue updated with ${task.cts.tid_tokens[0]}`].join(" ");
+                    new Notice(message);
+                    console.log(message);
+                } else {
+                    const message = [`Task for new issue could not be updated with ${task.cts.tid_tokens[0]}`].join(" ");
+                    new Notice(message);
+                    console.log(message);
+                }
+            } else {
+                task.cts.tid_tokens.forEach((token) => { 
+                    mapped_tokens.push(token);
+                });
+            }
 
             // console.log(["New issue to be created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" "));
             

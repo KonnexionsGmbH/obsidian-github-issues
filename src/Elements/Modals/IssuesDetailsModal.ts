@@ -63,6 +63,9 @@ export class IssuesDetailsModal extends Modal {
 			}
 		}
 
+		this.showButtonIfChanged(titleInput, saveTitleButton, details.title);
+
+
 		const createdContainer = contentEl.createDiv();
 		createdContainer.classList.add("issue-details-created-container");
 
@@ -224,10 +227,15 @@ export class IssuesDetailsModal extends Modal {
 		const descriptionPreview = descriptionContainer.createDiv();
 		descriptionPreview.classList.add("issue-details-description-preview");
 
+		let new_description = "" + this.issue.description;
+		if (!new_description.contains(details.body)) {
+			new_description = new_description + "\n" + details.body;
+		}
+
 		// Initial markdown render
 		await MarkdownRenderer.render(
 			this.app,
-			details.body,
+			new_description,
 			descriptionPreview,
 			'',
 			new Component()
@@ -238,7 +246,7 @@ export class IssuesDetailsModal extends Modal {
 			textarea.style.height = `${textarea.scrollHeight}px`;
 		};
 
-		const descriptionInput = descriptionContainer.createEl("textarea", { text: details.body });
+		const descriptionInput = descriptionContainer.createEl("textarea", { text: new_description });
 		descriptionInput.classList.add("issue-details-description-input");
 		descriptionInput.style.display = "none";
 
@@ -289,6 +297,8 @@ export class IssuesDetailsModal extends Modal {
 				new Notice("Could not update issue");
 			}
 		}
+
+		this.showButtonIfChanged(descriptionInput, saveDescriptionButton, details.body);
 
 		//load the comments
 		const spinner2 = loadingSpinner();
@@ -370,6 +380,8 @@ export class IssuesDetailsModal extends Modal {
 			}
 		}
 
+		this.showButtonIfChanged(commentInput, commentButton, "");
+
 		closeButton.onclick = async () => {
 			const updated = await api_update_issue(this.octokit, this.issue, {
 				state: "closed"
@@ -383,6 +395,18 @@ export class IssuesDetailsModal extends Modal {
 			}
 		}
 
+	}
+
+	private showButtonIfChanged(input: HTMLTextAreaElement, button: HTMLButtonElement, initialValue: string) {
+			if ( !(input.value) && !(initialValue) ) {
+				button.classList.remove("visible");
+			} else if (!(initialValue)) {
+				button.classList.add("visible");
+			} else if (input.value !== initialValue) {
+				button.classList.add("visible");
+			} else {
+				button.classList.remove("visible");
+			}
 	}
 
 	private showButtonOnInputChange(input: HTMLTextAreaElement, button: HTMLButtonElement, initialValue: string) {

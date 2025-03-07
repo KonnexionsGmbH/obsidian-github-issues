@@ -293,14 +293,15 @@ export default class MyPlugin extends Plugin {
 						sortAndPruneTasksNote( editor, facc, view_params);
 						console.log("facc after issueToTaskSync/sort");
 						console.log(structuredClone(facc));
-/*
+
 						for (let f=0; f < facc.length; f++) {
 							if (!facc[f].hidden) {
 								for (let t = 0; t < facc[f].tasks.length; t++) {
 									let task = facc[f].tasks[t];
 									if (task.cts.product_tokens.length > 0) {
 										// task refers to this repo
-										await taskToIssueSync(task, this.octokit, view_params, editor, issues, iids, bad_tasks_alerts, this.settings.username);
+										await taskToIssueSync(task, this.octokit, view_params, editor, issues, 
+											iids, bad_tasks_alerts, this.settings.username, set_ids);
 									}
 								}
 							}
@@ -308,7 +309,7 @@ export default class MyPlugin extends Plugin {
 
 						console.log("facc after taskToIssueSync");
 						console.log(structuredClone(facc));
-*/
+
 						if (bad_tasks_alerts.length > 0) {
 							const bt = 'The synchronisation from Obsidian to GitHub failed (at least partially). Please check the following findings.';
 							createBadTaskAlert(el, bt);
