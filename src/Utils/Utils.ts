@@ -1,4 +1,5 @@
-import { App } from "obsidian";
+import { AnyARecord, AnyRecord } from "dns";
+import { App, PluginManifest} from "obsidian";
 
 /** 
  * Re-renders the current view
@@ -70,3 +71,22 @@ export function getPasteableTimeDelta(dateString: string) {
 	}
 }
 
+/**
+ * Class File System Context
+ */
+export class FSContext {
+	homeDirectory: string;
+	vaultDirectory: string;
+	pluginDirectory: string;
+
+	constructor(app: App, manifest: PluginManifest) {
+		this.homeDirectory = process.env.HOME || process.env.USERPROFILE || '';
+		// @ts-ignore Property 'basePath' exists at runtime but is not typed
+		this.vaultDirectory = app.vault.adapter.basePath;
+		// @ts-ignore Property 'manifest' exists at runtime but is not typed
+		this.pluginDirectory = app.vault.configDir + '/plugins/' + manifest.id;
+		console.log("homeDirectory: ", this.homeDirectory);
+		console.log("vaultDirectory: ", this.vaultDirectory);
+		console.log("pluginDirectory: ", this.pluginDirectory);
+	}
+}
