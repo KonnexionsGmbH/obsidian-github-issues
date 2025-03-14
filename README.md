@@ -83,6 +83,15 @@ This assumes that:
 - products/components are managed in separate (foreign) repos. Picking these labels only remind
 - of dependencies to other repos.
 - Product tags without repo name are assumed to be managed in this repo.
+- Manually create and color all product/component labels (local and foreign) in the Github repo.
+- Manually create and color all priority labels in the Github repo.
+| code       | Description                               |
+| ---------  | ----------------------------------------- |
+| p_backlog  | Priority lowest |
+| p_low      | Priority low | 
+| p_high     | Priority high |
+| p_highest  | Highest normal priority (below critical) |
+| p_critical | Priority highest |
 
 Switch a query page to edit view and back to do a sync cycle.
 
