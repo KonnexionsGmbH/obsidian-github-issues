@@ -15,7 +15,7 @@ import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
 import { Issue, ClassLabels, IssueSortOrder, sortIssues, allProperLabels } from "./Issues/Issue";
 import { Feature, parseTaskNote, collectBadTaskAlerts, sortAndPruneTasksNote, issueToTaskSync, issueToForeignTaskSync, taskToIssueSync } from "./Tasks/Tasks";
 import { errors } from "./Messages/Errors";
-import { FSContext, reRenderView } from "./Utils/Utils";
+import { nesv, reRenderView } from "./Utils/Utils";
 
 //enum for the appearance of the issues when pasted into the editor
 export enum IssueAppearance {
@@ -142,8 +142,8 @@ export default class MyPlugin extends Plugin {
 			new Notice("Please enter your password in the settings.");
 		} else {
 			try {
-				this.octokit = (await api_authenticate(this.settings.password ?? this.git_pat, this.settings.api_endpoint))
-					? new Octokit({ auth: this.settings.password ?? this.git_pat })
+				this.octokit = (await api_authenticate(nesv(this.settings.password, this.git_pat), this.settings.api_endpoint))
+					? new Octokit({ auth: nesv(this.settings.password, this.git_pat) })
 					: new Octokit({ auth: "" });
 				if (!this.octokit) {
 					new Notice("Authentication failed. Please check your Git credentials in the plugin credentials.");
@@ -218,13 +218,13 @@ export default class MyPlugin extends Plugin {
 					console.log(error);
 					el.createEl("h4", { text: `Could not connect to GitHub repo ${view_params.owner + "/" + view_params.repo}` });
 					el.createEl("body", { text: "Please check:"});
-					el.createEl("body", { text: " * GitHub user and personal access token in the plugin config" });
+					el.createEl("body", { text: " * GitHub user and personal access token in the plugin config or in OS User environment variables." });
 					el.createEl("body", { text: " * Query parameters in this document:" });
-					el.createEl("body", { text: " - - owner/repo" });
-					el.createEl("body", { text: " - - task note file name (e.g. IO-XPA Releases) " });
-					el.createEl("body", { text: " - - task tag (e.g. #task)" });
-					el.createEl("body", { text: " - - hidden feature tag (e.g. #hidden)" });
-					el.createEl("body", { text: " -  - product tokens (e.g. #App/repo)" });
+					el.createEl("body", { text: " 1 - owner/repo" });
+					el.createEl("body", { text: " 2 - task note file name (e.g. IO-XPA Releases) " });
+					el.createEl("body", { text: " 3 - task tag (e.g. #task)" });
+					el.createEl("body", { text: " 4 - hidden feature tag (e.g. #hidden)" });
+					el.createEl("body", { text: " 5++ product/repo tokens (e.g. #App/repo)" });
 				}
 				
 				open_issue_count = issues.length;
@@ -460,17 +460,22 @@ class GithubIssuesSettings extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.username = value;
 						await this.plugin.saveSettings();
+						
+						console.log("GIT_USER: ", this.plugin.git_user);
+						console.log("GIT_PAT: ", this.plugin.git_pat);
+
+						//trigger reauthentication
 						this.plugin.octokit = (await api_authenticate(
-							this.plugin.settings.password ?? this.plugin.git_pat,
+							nesv(this.plugin.settings.password, this.plugin.git_pat),
 							this.plugin.settings.api_endpoint,
 						))
 							? new Octokit({
-								auth: this.plugin.settings.password ?? this.plugin.git_pat,
+								auth: nesv(this.plugin.settings.password, this.plugin.git_pat),
 							})
 							: new Octokit({});
 						if (
 							this.plugin.octokit &&
-							(this.plugin.settings.password ?? this.plugin.git_pat)
+							nesv(this.plugin.settings.password, this.plugin.git_pat)
 						) {
 							new Notice("Successfully authenticated!");
 						}
@@ -489,18 +494,22 @@ class GithubIssuesSettings extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.password = value;
 						await this.plugin.saveSettings();
+
+						console.log("GIT_USER: ", this.plugin.git_user);
+						console.log("GIT_PAT: ", this.plugin.git_pat);
+
 						//trigger reauthentication
 						this.plugin.octokit = (await api_authenticate(
-							this.plugin.settings.password ?? this.plugin.git_pat,
+							nesv(this.plugin.settings.password, this.plugin.git_pat),
 							this.plugin.settings.api_endpoint,
 						))
 							? new Octokit({
-								auth: this.plugin.settings.password ?? this.plugin.git_pat,
+								auth: nesv(this.plugin.settings.password, this.plugin.git_pat),
 							})
 							: new Octokit({});
 						if (
 							this.plugin.octokit &&
-							(this.plugin.settings.username ?? this.plugin.git_user)
+							nesv(this.plugin.settings.username, this.plugin.git_user)
 						) {
 							new Notice("Successfully authenticated!");
 						}
@@ -518,18 +527,22 @@ class GithubIssuesSettings extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.api_endpoint = value;
 						await this.plugin.saveSettings();
+
+						console.log("GIT_USER: ", this.plugin.git_user);
+						console.log("GIT_PAT: ", this.plugin.git_pat);
+
 						//trigger reauthentication
 						this.plugin.octokit = (await api_authenticate(
-							this.plugin.settings.password ?? this.plugin.git_pat,
+							nesv(this.plugin.settings.password, this.plugin.git_pat),
 							this.plugin.settings.api_endpoint,
 						))
 							? new Octokit({
-								auth: this.plugin.settings.password ?? this.plugin.git_pat,
+								auth: nesv(this.plugin.settings.password, this.plugin.git_pat),
 							})
 							: new Octokit({});
 						if (
 							this.plugin.octokit &&
-							(this.plugin.settings.username ?? this.plugin.git_user)
+							nesv(this.plugin.settings.username, this.plugin.git_user)
 						) {
 							new Notice("Successfully authenticated!");
 						}

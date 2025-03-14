@@ -72,21 +72,18 @@ export function getPasteableTimeDelta(dateString: string) {
 }
 
 /**
- * Class File System Context
+ * first non-empty string value
+ * @param conf configuration value (preferred if not empty)
+ * @param env  environment value (only if not undefined)
+ * @returns conf | env | ""
  */
-export class FSContext {
-	homeDirectory: string;
-	vaultDirectory: string;
-	pluginDirectory: string;
 
-	constructor(app: App, manifest: PluginManifest) {
-		this.homeDirectory = process.env.HOME || process.env.USERPROFILE || '';
-		// @ts-ignore Property 'basePath' exists at runtime but is not typed
-		this.vaultDirectory = app.vault.adapter.basePath;
-		// @ts-ignore Property 'manifest' exists at runtime but is not typed
-		this.pluginDirectory = app.vault.configDir + '/plugins/' + manifest.id;
-		console.log("homeDirectory: ", this.homeDirectory);
-		console.log("vaultDirectory: ", this.vaultDirectory);
-		console.log("pluginDirectory: ", this.pluginDirectory);
+export function nesv(conf: string, env: string|undefined): string {
+	if (conf > "") {
+		return conf;
+	} else if (env) {
+		return env;
+	} else {
+		return "";
 	}
 }
