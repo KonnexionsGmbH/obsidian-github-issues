@@ -1,32 +1,49 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, Editor, FileSystemAdapter} from "obsidian";
+import { 
+	App, 
+	Notice, 
+	Plugin, 
+	PluginSettingTab, 
+	Setting, 
+	Editor } from "obsidian";
+
+import { 
+	Octokit } from "@octokit/core";
+	
 import {
 	api_authenticate,
 	api_get_own_issues,
 	api_get_labels,
 	Label,
 	api_create_new_label,
-	api_set_labels_on_issue
-} from "./API/ApiHandler";
-import { IssuesModal } from "./Elements/Modals/IssuesModal";
-import { Octokit } from "@octokit/core";
-import { updateIssues } from "./Issues/IssueUpdater";
-import { NewIssueModal } from "./Elements/Modals/NewIssueModal";
-import { IssueItems, createBadTaskAlert } from "./Elements/IssueItems";
-import { Issue, ClassLabels, IssueSortOrder, sortIssues, allProperLabels } from "./Issues/Issue";
-import { Feature, parseTaskNote, collectBadTaskAlerts, sortAndPruneTasksNote, issueToTaskSync, issueToForeignTaskSync, taskToIssueSync } from "./Tasks/Tasks";
-import { errors } from "./Messages/Errors";
-import { nesv, reRenderView } from "./Utils/Utils";
+	api_set_labels_on_issue } from "./API/ApiHandler";
 
-//enum for the appearance of the issues when pasted into the editor
-export enum IssueAppearance {
-	DEFAULT = "default",
-	COMPACT = "compact",
-}
+import { 
+	Issue, 
+	ClassLabels, 
+	IssueSortOrder, 
+	sortIssues, 
+	allProperLabels } from "./Issues/Issue";
+
+import {
+	IssueItems, 
+	createBadTaskAlert } from "./Elements/IssueItems";
+	
+import { 
+	Feature, 
+	parseTaskNote, 
+	collectBadTaskAlerts, 
+	sortAndPruneTasksNote, 
+	issueToTaskSync, 
+	taskToIssueSync,
+	issueToForeignTaskSync } from "./Tasks/Tasks";
+
+import { 
+	nesv, 
+	reRenderView } from "./Utils/Utils";
 
 interface MyPluginSettings {
 	username: string;
 	password: string;
-	issue_appearance: IssueAppearance;
 	show_searchbar: boolean;
 	api_endpoint: string;
 }
@@ -34,7 +51,6 @@ interface MyPluginSettings {
 const DEFAULT_SETTINGS: MyPluginSettings = {
 	username: "",
 	password: "",
-	issue_appearance: IssueAppearance.DEFAULT,
 	show_searchbar: true,
 	api_endpoint: "https://api.github.com",
 };
@@ -51,7 +67,7 @@ export class IssueViewParams {
 	product_tokens: string[] = [];		// for products in this repo
 	foreign_tokens: string[] = []; 		// for products in other repos
 
-/* Sample config
+/* Sample query block config
 ```github-issues
 io-swiss/io-niesen
 IO-XPA Releases
@@ -72,28 +88,22 @@ IO-XPA Releases
         this.file_name = "";
 
 		if (source.length > 1) { 
-			// console.log("File name: ", source[1]);
 			this.file_name = source[1].trim()
 		};
 		if (source.length > 2) { 
-			// console.log("Task token: ", source[2]);
 			this.task_token = source[2].trim()
 		};
 		if (source.length > 3) { 
-			// console.log("Hidden token: ", source[3]);
 			this.hidden_token = source[3].trim()
 		};
 		if (source.length > 4) {
 			for (let i = 4; i < source.length; i++) {
 				const words = source[i].trim().split("/");
 				if ((words.length > 1) && (words[1] == this.repo)) {
-					// console.log("Product token: ", source[i]);
 					this.product_tokens.push(words[0].trim());
 				} else if (words.length == 1) {
-					// console.log("Product token: ", source[i]);
 					this.product_tokens.push(words[0].trim());
 				} else {
-					// console.log("Foreign token: ", source[i]);
 					this.foreign_tokens.push(words[0].trim())
 				}
 			}
@@ -107,23 +117,6 @@ export default class MyPlugin extends Plugin {
 	octokit: Octokit = new Octokit({ auth: "" });
 	git_user: string|undefined;
 	git_pat: string|undefined;
-
-/*			
-	getAbsolutePath(fileName: string): string {
-		let basePath;
-		let relativePath;
-		// base path
-		if (this.app.vault.adapter instanceof FileSystemAdapter) {
-			basePath = this.app.vault.adapter.getBasePath();
-		} else {
-			throw new Error('Cannot determine base path.');
-		}
-		// relative path
-		relativePath = `${this.app.vault.configDir}/plugins/linked-data-vocabularies/${fileName}`;
-		// absolute path
-		return `${basePath}/${relativePath}`;
-	}
-*/
 
 	async onload() {
 
@@ -186,30 +179,6 @@ export default class MyPlugin extends Plugin {
 				const openIssuesPromise: Promise<Issue[]> = api_get_own_issues(this.octokit, view_params);
 
 				let open_issue_count = -1;
-
-				let editor: Editor;
-				let facc: Feature[] = [];
-				this.app.workspace.iterateRootLeaves((leaf) => {
-					if ((leaf.getDisplayText() == view_params.file_name) && (leaf.getViewState().type == "markdown")) {
-						this.app.workspace.setActiveLeaf(leaf, { focus: true });
-						if (leaf.view) {							
-							editor = leaf.view.editor;  // VSCode sees a problem here but it works
-							facc = parseTaskNote(editor, view_params, facc);
-							console.log("facc after load/parse");
-							console.log(structuredClone(facc));
-						}
-					}
-				})
-
-/*
-				const task_config_path = this.getAbsolutePath(".obsidian/plugins/obsidian-tasks-plugin/data.json");
-				console.log(task_config_path);
-		  
-				if (this.app.vault.adapter instanceof FileSystemAdapter) {
-				  let basePath = this.app.vault.adapter.getBasePath();
-				  console.log(basePath);
-				}
-*/			  
 				let issues: Issue[] = [];
 				try {
 					issues = await openIssuesPromise;					
@@ -229,13 +198,29 @@ export default class MyPlugin extends Plugin {
 				
 				open_issue_count = issues.length;
 
-				// sortIssues(issues, IssueSortOrder.feature);
+				// Check if we find the note with the tasks (release plan for features and their tasks)
+				// This note must be open in the workspace (side by side to the dynamic issue query)
+				let editor: Editor | undefined;
+				let facc: Feature[] = [];
+				this.app.workspace.iterateRootLeaves((leaf) => {
+					if ( editor == undefined
+						&& (leaf.getDisplayText() == view_params.file_name) 
+						&& (leaf.getViewState().type == "markdown")) {
+						this.app.workspace.setActiveLeaf(leaf, { focus: true });
+						if (leaf.view) {							
+							editor = leaf.view.editor;  // VSCode sees a problem here but it works
+							if (editor) {
+								facc = parseTaskNote(editor, view_params, facc);
+								console.log("facc after load/parse");
+								console.log(structuredClone(facc));
+							}
+						}
+					}
+				})
 
 				let repo_class_labels: ClassLabels = await allRepoLabelsPromise;
 
-				// console.log(repo_class_labels);
-
-				if (facc.length > 0)  {
+				if ( editor && (facc.length > 0) )  {
 					const repo_labels = new Set<string>();
 					repo_class_labels.feature_labels.forEach((label) => {
 						repo_labels.add(label.name);
@@ -247,8 +232,6 @@ export default class MyPlugin extends Plugin {
 								missing_labels.add(feature.tag);						
 						}
 					});
-
-					// console.log("Missing Labels in GitHub: ", missing_labels);
 
 					missing_labels.forEach(async (name) => {
 						const created = await api_create_new_label(
@@ -359,51 +342,6 @@ export default class MyPlugin extends Plugin {
 					)});
 			},
 		);
-
-		//add issues of repo command
-		this.addCommand({
-			id: "embed-issues",
-			name: "Embed open Issues",
-			callback: () => {
-				if (this.octokit) {
-					//check if repo already exists in file
-					new IssuesModal(this.app, {
-						octokit: this.octokit,
-						plugin_settings: this.settings,
-					} as OctoBundle).open();
-				} else {
-					new Notice(errors.noCreds);
-				}
-			},
-		});
-
-		this.addCommand({
-			id: "update-issues",
-			name: "Force-update Issues",
-			callback: () => {
-				if (this.octokit) {
-					new Notice("Updating issues...");
-					updateIssues(this.app);
-				} else {
-					new Notice(errors.noCreds);
-				}
-			},
-		});
-
-		this.addCommand({
-			id: "new-issue",
-			name: "Create new Issue",
-			callback: () => {
-				if (this.octokit) {
-					new NewIssueModal(this.app, {
-						octokit: this.octokit,
-						plugin_settings: this.settings,
-					} as OctoBundle).open();
-				} else {
-					new Notice(errors.noCreds);
-				}
-			},
-		});
 	}
 
 	// onunload() {
@@ -442,7 +380,7 @@ class GithubIssuesSettings extends PluginSettingTab {
 				text: "To use this plugin, you need to create a personal access token PAT (which needs to be re-created from time to time). You can find a guide on how to do that in the ",
 			}).createEl("a", {
 				text: "README.",
-				href: "https://github.com/Frostplexx/obsidian-github-issues#prerequisites",
+				href: "https://github.com/KonnexionsGmbH/obsidian-github-issues#prerequisites",
 			});
 
 		containerEl.createEl("h2", {
@@ -452,7 +390,7 @@ class GithubIssuesSettings extends PluginSettingTab {
 		// username
 		new Setting(containerEl)
 			.setName("Username")
-			.setDesc("Your Github Username or Email")
+			.setDesc("Your Github Username or Email, default is OS-env 'GIT_USER' (if defined)")
 			.addText((text) =>
 				text
 					.setPlaceholder("OS-Env: GIT_USER")
@@ -460,10 +398,6 @@ class GithubIssuesSettings extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.username = value;
 						await this.plugin.saveSettings();
-						
-						console.log("GIT_USER: ", this.plugin.git_user);
-						console.log("GIT_PAT: ", this.plugin.git_pat);
-
 						//trigger reauthentication
 						this.plugin.octokit = (await api_authenticate(
 							nesv(this.plugin.settings.password, this.plugin.git_pat),
@@ -486,7 +420,7 @@ class GithubIssuesSettings extends PluginSettingTab {
 		// password
 		new Setting(containerEl)
 			.setName("Personal Authentication Token")
-			.setDesc("Personal Authentication Token")
+			.setDesc("Personal Authentication Token, default is OS-env 'GIT_PAT' (if defined)")
 			.addText((text) =>
 				text
 					.setPlaceholder("OS-Env: GIT_PAT")
@@ -494,10 +428,6 @@ class GithubIssuesSettings extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.password = value;
 						await this.plugin.saveSettings();
-
-						console.log("GIT_USER: ", this.plugin.git_user);
-						console.log("GIT_PAT: ", this.plugin.git_pat);
-
 						//trigger reauthentication
 						this.plugin.octokit = (await api_authenticate(
 							nesv(this.plugin.settings.password, this.plugin.git_pat),
@@ -527,10 +457,6 @@ class GithubIssuesSettings extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.api_endpoint = value;
 						await this.plugin.saveSettings();
-
-						console.log("GIT_USER: ", this.plugin.git_user);
-						console.log("GIT_PAT: ", this.plugin.git_pat);
-
 						//trigger reauthentication
 						this.plugin.octokit = (await api_authenticate(
 							nesv(this.plugin.settings.password, this.plugin.git_pat),
@@ -549,24 +475,6 @@ class GithubIssuesSettings extends PluginSettingTab {
 					}),
 			);
 
-		containerEl.createEl("h2", { text: "Appearance" });
-		new Setting(containerEl)
-			.setName("Issues Appearance")
-			.setDesc("How should the issues be displayed?")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption(IssueAppearance.DEFAULT, "Default")
-					.addOption(IssueAppearance.COMPACT, "Compact")
-					.setValue(this.plugin.settings.issue_appearance)
-					.onChange(async (value: IssueAppearance) => {
-						// console.log("Appearance: " + value);
-						this.plugin.settings.issue_appearance = value;
-						await this.plugin.saveSettings();
-
-						reRenderView(this.app);
-
-					}),
-			);
 		new Setting(containerEl)
 			.setName("Show Searchbar")
 			.setDesc("Show a searchbar above the issues in the embed.")
