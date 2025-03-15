@@ -5,7 +5,7 @@ import { IssueViewParams } from "../main";
 import { Octokit } from "@octokit/core";
 
 /**
- * ClassLabels class
+ * ClassLabels class (classified and ordered label structure)
  */
 export class ClassTokens {
 
@@ -66,7 +66,7 @@ export class ClassTokens {
 
 
 /**
- * Task class
+ * Task class (container for a parsed Task line and immediately following task description/annotations)
  */
 export class Task {
     start: number;              // line number in 'ReleasesNote'
@@ -89,7 +89,7 @@ export class Task {
 }
 
 /**
- * Feature class
+ * Feature class (container for a level 3 heading starting with a feature tag and associated tasks under this heading)
  */
 export class Feature {
     start: number;              // line number in ReleasesNote
@@ -111,13 +111,16 @@ export class Feature {
 
 // - [ ] #task One more task #Core #Server #102 🔺 🛫 2025-02-01 ✅ 2025-01-31
 // - [ ] #task One more task #Core #Server #102 🔼 🛫 2025-02-01
-// - [ ] #task One more task #Core #Server #102 🔽 🛫 2025-02-01
-// - [ ] #task One more task #Core #Server ⏫
-// - [ ] #task One more task #Core #Server #102 🔺 🔁 every day 🛫 2025-02-01 ❌ 2025-01-31
-// - [ ] #task One more task #Core #Server #102 ⏬ 🛫 2025-02-01
+// - [s] #task One more task #Core #Server #102 🔽 🛫 2025-02-01
+// - [/] #task One more task #Core #Server ⏫
+// - [L] #task One more task #Core #Server #102 🔺 🔁 every day 🛫 2025-02-01 ❌ 2025-01-31
+// - [-] #task One more task #Core #Server #102 ⏬ 🛫 2025-02-01
 // - [x] #task Description comes here 🆔 uo7126 ⛔ t3ls4p ⏫ ➕ 2025-02-03 ⏳ 2025-01-24 📅 2025-02-07
 
-
+/**
+ * Task priority token from Issue priority label
+ * @param label
+ */
 function prioTokenFromLabel(label: Label): string {
     const prios = "⏬🔽🔼⏫🔺";		// prio0 .. prio4
     const idx = prioFromName(label.name);
@@ -131,6 +134,10 @@ function prioTokenFromLabel(label: Label): string {
     }
 }
 
+/**
+ * Task priority issue label name (hard coded) from priority token
+ * @param token
+ */
 function prioNameFromToken(token: string): string {
     const names = [ 'p_backlog', 'p_low', 'p_high', 'p_highest', 'p_critical' ];
     const tokens = "⏬🔽🔼⏫🔺";
@@ -143,8 +150,10 @@ function prioNameFromToken(token: string): string {
 }
 
 
-/*
+/**
  * Constructs a string which can be used to sort tasks by feature, title, products, IssueId
+ * @param title
+ * @param cts 
  */
 function taskSortKey(title: string, cts: ClassTokens ): string {
 	const res: string[] = [];
@@ -164,16 +173,25 @@ function taskSortKey(title: string, cts: ClassTokens ): string {
     return res.join();
 }
 
+/**
+ * Push a description text line to the last seen task
+ * @param this_feature
+ * @param this_task
+ * @param tacc
+ * @param line
+ */
 function pushTaskDescription(this_feature: string, this_task:string, tacc: Task[], line:string) {
     if (this_task.length > 0) {
         tacc[tacc.length-1].description = (tacc[tacc.length-1].description + "\n").concat(line);
     }
 }
 
-
-function cleanTaskDescription( d: string): string {
-    // trims and removes task description empty lines at the end 
-    const desc = d.split("\n").map(w => w.trim()).filter(line => line != "").join("\n");
+/**
+ * Trims and removes task description empty lines at the end 
+ * @param description
+ */
+function cleanTaskDescription( description: string): string {
+    const desc = description.split("\n").map(w => w.trim()).filter(line => line != "").join("\n");
     if (desc == "") {
         return ""
     } else {
@@ -181,13 +199,20 @@ function cleanTaskDescription( d: string): string {
     }
 }
 
-function finishTask(this_feature: string, this_task: string, tacc: Task[], i: number): [string,string] {
+/**
+ * Completes a task after seeing a line which cannot be part of the last task
+ * @param this_feature
+ * @param this_task
+ * @param tacc
+ * @param line_number
+ */
+function finishTask(this_feature: string, this_task: string, tacc: Task[], line_number: number): [string,string] {
     // may be called without open task(this_task == "")
     if (this_task.length > 0) {
         if (tacc[tacc.length - 1].end == 0) {
-            tacc[tacc.length - 1].end = i;
+            tacc[tacc.length - 1].end = line_number;
         } else {
-            console.log("Cannot re-finish in finishTask old and new end: ", tacc[tacc.length-1].end, i )
+            console.log("Cannot re-finish in finishTask old and new end: ", tacc[tacc.length-1].end, line_number )
         }
     } else if (tacc.length > 0) {
         if (tacc[tacc.length - 1].end == 0) {
@@ -197,10 +222,20 @@ function finishTask(this_feature: string, this_task: string, tacc: Task[], i: nu
     return [this_feature,""];
 }
 
-function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: number, line: string, view_params: IssueViewParams): [string,string] {
+/**
+ * Optionally completes the current task and creates a new one
+ * @param this_feature
+ * @param this_task
+ * @param tacc
+ * @param line_number
+ * @param line
+ * @param view_params
+ */
+function startNewTask(this_feature: string, this_task: string, tacc: Task[], line_number: number, 
+                        line: string, view_params: IssueViewParams): [string,string] {
 
     if (this_task.length > 0) {
-        [this_feature, this_task] = finishTask(this_feature, this_task, tacc, i);
+        [this_feature, this_task] = finishTask(this_feature, this_task, tacc, line_number);
     }
 
     const task_tokens = "⏬🔽🔼⏫🔺➕⏳📅🛫✅❌🔁⛔🆔";
@@ -243,19 +278,27 @@ function startNewTask(this_feature: string, this_task: string, tacc: Task[], i: 
     this_task = title_acc.join(" ");
     const cts = new ClassTokens(mapped_tokens, view_params);
        
-    tacc.push(new Task(i, 0, this_task, "", cts, taskSortKey(this_task, cts), line.substring(task_pos - 3, task_pos - 2)));
+    tacc.push(new Task(line_number, 0, this_task, "", cts, taskSortKey(this_task, cts), line.substring(task_pos - 3, task_pos - 2)));
     return [this_feature,this_task];
 }
 
-function finishFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i: number): [string,string] {
+/**
+ * Completes a feature after seeing a line which cannot be part of the last feature
+ * @param this_feature
+ * @param this_task
+ * @param facc
+ * @param tacc
+ * @param line_number
+ */
+function finishFeature(this_feature: string, this_task: string, facc: Feature[], 
+                        tacc: Task[], line_number: number): [string,string] {
 
     if (facc[facc.length-1].tag == this_feature) {
-        facc[facc.length-1].end = i;
+        facc[facc.length-1].end = line_number;
         if (this_task.length > 0) {
-            [this_feature, this_task] = finishTask(this_feature, this_task, tacc, i);
+            [this_feature, this_task] = finishTask(this_feature, this_task, tacc, line_number);
         }
         facc[facc.length - 1].tasks = tacc;
-        // console.log("Completed Feature: ", facc.length-1, facc[facc.length-1]);
         tacc = [];
     } else {
         console.log("Tag not matching in finishFeature()");
@@ -263,17 +306,32 @@ function finishFeature(this_feature: string, this_task: string, facc: Feature[],
     return ["",""];
 }
 
-function startNewFeature(this_feature: string, this_task: string, facc: Feature[], tacc: Task[], i: number, line: string): [string,string] {
+/**
+ * Optionally completes a feature and creates a new one
+ * @param this_feature
+ * @param this_task
+ * @param facc
+ * @param tacc
+ * @param line_number
+ * @param line
+ */
+function startNewFeature(this_feature: string, this_task: string, facc: Feature[], 
+                            tacc: Task[], line_number: number, line: string): [string,string] {
     if (this_feature.length > 0) {
-        [this_feature, this_task] = finishFeature(this_feature, this_task, facc, tacc, i);
+        [this_feature, this_task] = finishFeature(this_feature, this_task, facc, tacc, line_number);
     }
     const words = line.split(" ");
     this_feature = words[1];
-    facc.push(new Feature(i, 0, this_feature, false, []));
-    // console.log("New Feature: ", facc.length-1, facc[facc.length-1]);
+    facc.push(new Feature(line_number, 0, this_feature, false, []));
     return [this_feature, ""];
 }
 
+/**
+ * Parses an obsidian markdown task note (ReleasesNote) and extracts features and associated tasks
+ * @param editor
+ * @param view_params
+ * @param facc
+ */
 export function parseTaskNote(editor: Editor, view_params: IssueViewParams, facc: Feature[]): Feature[] {
     let tacc: Task[] = [];
     let this_feature = "";
@@ -309,6 +367,12 @@ export function parseTaskNote(editor: Editor, view_params: IssueViewParams, facc
     return facc;
 }
 
+/**
+ * Walks a feature accumulator and sorts and normalizes associated tasks for each feature
+ * @param editor
+ * @param facc
+ * @param view_params
+ */
 export function sortAndPruneTasksNote(editor: Editor, facc: Feature[], view_params: IssueViewParams) {
 
     let line_shift = 0;
@@ -352,6 +416,12 @@ export function sortAndPruneTasksNote(editor: Editor, facc: Feature[], view_para
     }
 }
 
+/**
+ * Walks a feature accumulator and creates warnings for duplicates and inconsistencies.
+ * At the same time, it creates sets of IDs related to the current repo. 
+ * @param facc
+ * @param view_params
+ */
 export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewParams): [string[], Set<string>, Set<string>] {
     const bad_task_alerts: string[] = [];
     const set_ids = new Set<string>();     // issue ids for this repo over all features
@@ -407,6 +477,10 @@ export function collectBadTaskAlerts(facc: Feature[], view_params: IssueViewPara
     return [bad_task_alerts, set_ids, set_titles] ;
 }
 
+/**
+ * Generates a new task ID according to the Task plugin's standard.
+ * @param existingIds
+ */
 export function generateUniqueId(existingIds: Set<string>) {
     const tid_token = "🆔";		    // task ID
     let id = '';
@@ -424,7 +498,11 @@ export function generateUniqueId(existingIds: Set<string>) {
     return id;
 }
 
-
+/**
+ * Returns a task text line from a task object (main line only, without trailing line feed)
+ * @param task 
+ * @param view_params 
+ */
 function renderTask(task: Task, view_params: IssueViewParams): string {
     const header = '- [' + task.status_code + '] ' + view_params.task_token;        
     const res = [header, task.title].concat(
@@ -461,8 +539,16 @@ export function issueToForeignTaskSync(issue: Issue, view_params:IssueViewParams
     // to be implemented 
 }
 
-
-
+/**
+ * Walks the issue list loaded from GitHub and optinally inserts new issues as tasks into the ReleasesNote.
+ * Flags conflicts to be handled by the user as a findings attribute in the issues.
+ * @param issue 
+ * @param view_params 
+ * @param editor 
+ * @param facc 
+ * @param set_ids 
+ * @param set_titles 
+ */
 export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], 
         set_ids: Set<string>, set_titles: Set<string>) {
     
@@ -651,6 +737,19 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
     }
 }
 
+/**
+ * Synchronizes assigned tasks (for active features) to issues, if possible.
+ * Logs inconsistencies to be displayed for the user.
+ * @param task 
+ * @param octokit 
+ * @param view_params 
+ * @param editor 
+ * @param issues 
+ * @param iids 
+ * @param bad_tasks_alerts 
+ * @param user 
+ * @param set_ids 
+ */
 export async function taskToIssueSync(task: Task, octokit: Octokit, view_params: IssueViewParams, 
         editor: Editor, issues: Issue[], iids: string[], bad_tasks_alerts: string[], 
         user: string, set_ids: Set<string>) {

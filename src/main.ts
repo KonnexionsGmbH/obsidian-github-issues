@@ -4,7 +4,8 @@ import {
 	Plugin, 
 	PluginSettingTab, 
 	Setting, 
-	Editor } from "obsidian";
+	Editor,
+	FileSystemAdapter } from "obsidian";
 
 import { 
 	Octokit } from "@octokit/core";
@@ -41,6 +42,10 @@ import {
 	nesv, 
 	reRenderView } from "./Utils/Utils";
 
+import * as fs from 'fs';	
+
+import * as path from 'path';	
+
 interface MyPluginSettings {
 	username: string;
 	password: string;
@@ -53,6 +58,15 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	password: "",
 	show_searchbar: true,
 	api_endpoint: "https://api.github.com",
+};
+
+interface MyTaskStus {
+	symbol: string;	// e.g. "S"
+	name: string;	// e.g. "stoch working"
+	type: string;
+	nextStatusSymbol: string;
+	availableAsCommand: boolean;
+	user: string;	// e.g. "stoch"
 };
 
 /**
@@ -115,16 +129,17 @@ IO-XPA Releases
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 	octokit: Octokit = new Octokit({ auth: "" });
-	git_user: string|undefined;
-	git_pat: string|undefined;
+	git_user: string | undefined;
+	git_pat: string | undefined;
+	task_states: MyTaskStus[] = [];
 
 	async onload() {
 
 		await this.loadSettings();
 		this.git_user = process.env.GIT_USER;
 		this.git_pat = process.env.GIT_PAT;
-		console.log("GIT_USER: ", this.git_user);
-		console.log("GIT_PAT: ", this.git_pat);
+		// console.log("GIT_USER: ", this.git_user);
+		// console.log("GIT_PAT: ", this.git_pat);
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new GithubIssuesSettings(this.app, this));
@@ -144,6 +159,20 @@ export default class MyPlugin extends Plugin {
 			} catch (e) {
 				new Notice("Authentication failed. Please check your Git in the plugin credentials.");
 			}
+		}
+
+		if (this.app.vault.adapter instanceof FileSystemAdapter) {
+			const dataFilePath = path.join(
+				this.app.vault.adapter.getBasePath(),
+				this.app.vault.configDir ,
+				"plugins",
+				"obsidian-tasks-plugin",
+				"data.json"
+			);
+			const tasks_settings_data = fs.readFileSync(dataFilePath, "utf8");
+			const tasks_config = JSON.parse(tasks_settings_data);
+			this.task_states = tasks_config.statusSettings.customStatuses;
+			// console.log("this.task_states: ", this.task_states);
 		}
 
 		//register markdown post processor

@@ -9,6 +9,7 @@ import { IssueViewParams } from "../main";
 /**
  * Checks if the github api is reachable with the given token
  * @param token
+ * @param base_url
  */
 export async function api_authenticate(token: string, base_url: string): Promise<Octokit | null> {
 	const octokit = new Octokit({
@@ -26,7 +27,7 @@ export async function api_authenticate(token: string, base_url: string): Promise
 }
 
 /**
- * Returns all the repos of a user specified by the username
+ * Returns all the repos of a user specified by the username (not yet used)
  * @param octokit
  */
 export async function api_get_repos(octokit: Octokit) {
@@ -53,15 +54,16 @@ export async function api_get_repos(octokit: Octokit) {
  * Creates new labels on GitHub
  * @param octokit
  * @param view_params
+ * @param label_name
  */
-export async function api_create_new_label(octokit: Octokit, view_params: IssueViewParams, name: string) {
+export async function api_create_new_label(octokit: Octokit, view_params: IssueViewParams, label_name: string) {
 	if (view_params == null) return false;
 	const res = await octokit.request('POST /repos/{owner}/{repo}/labels', {
 	owner: view_params.owner,
 	repo: view_params.repo,
-	name: name,
-	description: 'Feature Label',
-	color: 'aaaaaa',
+	name: label_name,
+	description: 'Feature Label',	// change this in GitHub if desired
+	color: 'aaaaaa',				// change this in GitHub if desired
 	headers: {
 	  'X-GitHub-Api-Version': '2022-11-28'
 	}
@@ -148,62 +150,10 @@ export async function api_submit_issue(octokit: Octokit, view_params: IssueViewP
 }
 
 /**
- * Returns all the issues of a repo as an array of Issue objects of a repo specified by the url
- * @param octokit
- * @param url
- */
-export async function api_get_issues_by_url(octokit: Octokit, url: string, view_params: IssueViewParams ): Promise<Issue[]> {
-	const { owner, repo } = parseRepoUrl(url);
-	const issues: Issue[] = [];
-	console.debug("api_get_issues_by_url");
-	try {
-		const res = await octokit.request('GET /repos/{owner}/{repo}/issues', {
-			owner: owner,
-			repo: repo,
-			headers: {
-				'X-GitHub-Api-Version': '2022-11-28'
-			}
-		})
-
-		if (res.status == 200) {
-			for (const issue of res.data) {
-				const mapped_labels = issue.labels.map((label: any) => {
-					return {
-						name: label.name,
-						color: label.color
-					} as Label;
-				})
-				const tl = new ClassLabels(mapped_labels, view_params, issue.number, issue.body ?? "");
-		
-				issues.push(new Issue(
-					issue.title,
-					issue.body ?? "",
-					issue.user?.login ?? "",
-					issue.number,
-					issue.created_at,
-					issue.assignee?.login ?? "",
-					tl,
-					view_params
-				));
-			}
-
-			return issues;
-		} else {
-			return [];
-		}
-
-	} catch (e) {
-		new Notice("Error while fetching issues: " + e.message);
-		return [];
-	}
-
-
-}
-
-/**
- * Returns all the issues of a repo as an array of Issue objects
+ * Returns all open issues of a repo as an array of Issue objects
  * @param octokit
  * @param repo
+ * @param view_params
  */
 export async function api_get_own_issues(octokit: Octokit, view_params: IssueViewParams): Promise<Issue[]> {
 	const issues: Issue[] = [];
@@ -227,7 +177,6 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 			})
 			const description = issue.body ?? "";
 			const tl = new ClassLabels(mapped_labels, view_params, issue.number, description);
-			// console.log("Assignee login: ", issue.assignee?.login);
 			if (tl.tid_labels.length > 1) {
 				console.log(tl);
 			}
@@ -249,14 +198,14 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 	}
 }
 
-export async function api_get_issues_by_id(octokit: Octokit, view_params: IssueViewParams, issueIDs: number[]): Promise<Issue[]> {
-	const iss = await api_get_own_issues(octokit, view_params);
-	//filter the issues to only include the specified ones
-	return iss.filter(issue => issueIDs.includes(issue.number));
-}
-
+/**
+ * Returns one issue by Issue number (Issue ID), can fetch a closed issue too
+ * @param octokit
+ * @param repo
+ * @param view_params
+ * @param issue_num
+ */
 export async function api_get_issue_by_number(octokit: Octokit, view_params: IssueViewParams, issue_num: number) {
-	// can fetch a closed issue too
 
 	if (view_params.repo == null) return;
 
@@ -295,7 +244,11 @@ export async function api_get_issue_by_number(octokit: Octokit, view_params: Iss
 	}
 }
 
-
+/**
+ * Reloads one issue details from an already loaded issue object, could fetch a (meanwhile) closed issue too
+ * @param octokit
+ * @param issue
+ */
 export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
 	if (issue.view_params.repo == null) return;
 
@@ -333,6 +286,12 @@ export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
 	}
 }
 
+/**
+ * Saves a new comment for an already loaded issue object
+ * @param octokit
+ * @param issue
+ * @param comment
+ */
 export async function api_comment_on_issue(octokit: Octokit, issue: Issue, comment: string) {
 	if (issue.view_params.repo == null) return;
 	const res = await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
@@ -348,6 +307,12 @@ export async function api_comment_on_issue(octokit: Octokit, issue: Issue, comme
 	return res.status == 201;
 }
 
+/**
+ * Saves a new new set of labels for an already loaded issue object
+ * @param octokit
+ * @param issue
+ * @param comment
+ */
 export async function api_set_labels_on_issue(octokit: Octokit, issue: Issue, labels: string[]) {
 	if (issue.view_params.repo == null) return;
 	const res = await octokit.request('PUT /repos/{owner}/{repo}/issues/{issue_number}/labels', {
@@ -388,6 +353,11 @@ export async function api_update_issue(octokit: Octokit, issue: Issue, toBeUpdat
 	return res.status == 200;
 }
 
+/**
+ * Loads comments for an already loaded issue object
+ * @param octokit
+ * @param issue
+ */
 export async function api_get_issue_comments(octokit: Octokit, issue: Issue) {
 	if (issue.view_params.repo == null) return;
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
