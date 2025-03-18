@@ -1,5 +1,5 @@
 import { App, Component, MarkdownRenderer, Modal, Notice } from "obsidian";
-import { ClassLabels, Issue, allProperLabels} from "../../Issues/Issue";
+import { ClassLabels, Issue, allProperLabels } from "../../Issues/Issue";
 import { Octokit } from "@octokit/core";
 import { getPasteableTimeDelta, reRenderView } from "../../Utils/Utils";
 import { loadingSpinner } from "../../Utils/Loader";
@@ -16,7 +16,7 @@ import {
 import { getTextColor } from "../../Utils/Color.utils";
 import { IssueViewParams } from "src/main";
 
-function orderedAssignees(assignees: Assignee[] , logins: string[]): Assignee[] {
+function orderedAssignees(assignees: Assignee[], logins: string[]): Assignee[] {
 	if (logins.length == 0) {
 		return assignees;
 	} else {
@@ -87,30 +87,35 @@ export class IssuesDetailsModal extends Modal {
 
 		const createdContainer = contentEl.createDiv();
 		createdContainer.classList.add("issue-details-created-container");
-		const authorAndCreateDate = createdContainer.createSpan();
+
+		// Create a single line container with space-between
+		const infoLineContainer = createdContainer.createSpan();
+		infoLineContainer.classList.add("issue-details-info-line");
+
+		// Left group for author info
+		const authorGroup = infoLineContainer.createSpan();
+		authorGroup.classList.add("issue-details-author-group");
+
 		if (details.is_pull_request) {
-			//PR icon
-			const prPill = authorAndCreateDate.createEl("span", { text: "PR"});
+			const prPill = authorGroup.createEl("span", { text: "PR" });
 			prPill.classList.add("issue-details-pr-pill");
 			prPill.style.backgroundColor = "rgba(205, 57, 23, 0.5)";
-			//author login
-			const author = authorAndCreateDate.createSpan({
+			authorGroup.createSpan({
 				text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
 			});
 		} else {
-			//author icon
-			const authorIcon = authorAndCreateDate.createEl("img");
+			const authorIcon = authorGroup.createEl("img");
 			authorIcon.classList.add("issue-details-assignee-icon")
 			authorIcon.src = details?.avatar_url;
-			//author login
-			const author = authorAndCreateDate.createSpan({
+			authorGroup.createSpan({
 				text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
 			});
 		}
 
-		const issueLink = createdContainer.createEl("a", { text: this.view_params?.repo + ` #` + this.issue.number });
+		// Right-aligned issue link
+		const issueLink = infoLineContainer.createEl("a", { text: this.view_params?.repo + ` #` + this.issue.number });
 		issueLink.setAttribute("href", "https://github.com/" + this.view_params?.owner + "/" + this.view_params?.repo + "/issues/" + this.issue.number);
-		issueLink.classList.add("issue-details-link")
+		issueLink.classList.add("issue-details-link");
 
 		const assignedContainer = contentEl.createDiv();
 		// asignee login / icon
@@ -144,7 +149,7 @@ export class IssuesDetailsModal extends Modal {
 			assignee_text = 'not assigned';
 			assignedContainer.classList.remove('issue-findings');
 		}
-		const assignee = assignedContainer.createSpan({ text: assignee_text	});
+		const assignee = assignedContainer.createSpan({ text: assignee_text });
 
 		const stateAndLabelsContainer = contentEl.createDiv();
 		stateAndLabelsContainer.classList.add("issue-details-label-pill");
@@ -170,7 +175,7 @@ export class IssuesDetailsModal extends Modal {
 			} as Label;
 		})
 		const tl = new ClassLabels(mapped_labels, this.view_params, this.issue.number, "" + this.issue.description);
-		
+
 		//loop through the labels
 		// eslint-disable-next-line no-unsafe-optional-chaining
 		for (const label of allProperLabels(tl)) {
@@ -189,7 +194,7 @@ export class IssuesDetailsModal extends Modal {
 		labelsGrid.classList.add("issue-details-labels-grid");
 
 		if (this.view_params != null) {
-			const allLabels = this.repo_class_labels; 
+			const allLabels = this.repo_class_labels;
 			const originalSelections = new Set(details.labels.map(label => label.name));
 			const checkboxes: HTMLInputElement[] = [];
 
@@ -234,15 +239,15 @@ export class IssuesDetailsModal extends Modal {
 					labelsGrid.style.display = "none"
 				}
 			}
-	
+
 			labelsGrid.style.display = "none";
 
 			saveLabelsButton.onclick = async () => {
-				const labels = [...allLabels.feature_labels, 
-								...allLabels.priority_labels,
-								...allLabels.other_labels,
-								...allLabels.foreign_labels,
-								...allLabels.product_labels];
+				const labels = [...allLabels.feature_labels,
+				...allLabels.priority_labels,
+				...allLabels.other_labels,
+				...allLabels.foreign_labels,
+				...allLabels.product_labels];
 				const selectedLabels = Array.from(labelsGrid.querySelectorAll("input:checked")).map((checkbox: HTMLInputElement) => checkbox.value);
 				const updated = await api_set_labels_on_issue(this.octokit, this.view_params, this.issue, selectedLabels);
 				if (updated) {
@@ -439,33 +444,30 @@ export class IssuesDetailsModal extends Modal {
 
 	}
 
+	private normalizeText(text: string | null | undefined): string {
+		if (!text) return '';
+		return text
+			.replace(/\r\n/g, '\n')
+			.replace(/\r/g, '\n')
+			.trim();
+	}
+
 	private showButtonIfChanged(input: HTMLTextAreaElement, button: HTMLButtonElement, initialValue: string): boolean {
-			if ( !(input.value) && !(initialValue) ) {
-				button.classList.remove("visible");
-				return false;
-			} else if (!(initialValue)) {
-				button.classList.add("visible");
-				return true;
-			} else if (input.value !== initialValue) {
-				button.classList.add("visible");
-				return true;
-			} else {
-				button.classList.remove("visible");
-				return false;
-			}
+		const normalizedInput = this.normalizeText(input.value);
+		const normalizedInitial = this.normalizeText(initialValue);
+		debugger;
+		if (!normalizedInput && !normalizedInitial) {
+			button.classList.remove("visible");
+			return false;
+		}
+		const hasChanged = normalizedInput !== normalizedInitial;
+		button.classList.toggle("visible", hasChanged);
+		return hasChanged;
 	}
 
 	private showButtonOnInputChange(input: HTMLTextAreaElement, button: HTMLButtonElement, initialValue: string) {
 		input.addEventListener("input", () => {
-			if ( !(input.value) && !(initialValue) ) {
-				button.classList.remove("visible");
-			} else if (!(initialValue)) {
-				button.classList.add("visible");
-			} else if (input.value !== initialValue) {
-				button.classList.add("visible");
-			} else {
-				button.classList.remove("visible");
-			}
+			this.showButtonIfChanged(input, button, initialValue);
 		});
 	}
 
@@ -475,7 +477,7 @@ export class IssuesDetailsModal extends Modal {
 		labels: Label[],
 		checkboxes: HTMLElement[]
 	) {
-		for (let i = 0; i < Math.floor((labels.length+1) / 2); i++) {
+		for (let i = 0; i < Math.floor((labels.length + 1) / 2); i++) {
 			const row = labelsGrid.createDiv();
 			row.classList.add(i === 0 ? "issue-details-labels-row-first" : "issue-details-labels-row");
 
@@ -483,7 +485,7 @@ export class IssuesDetailsModal extends Modal {
 			this.createLabelElement(row, labels[i], originalSelections, checkboxes);
 
 			// Second label (if exists)
-			const secondIndex = i + Math.floor((labels.length+1) / 2);
+			const secondIndex = i + Math.floor((labels.length + 1) / 2);
 			if (secondIndex < labels.length) {
 				this.createLabelElement(row, labels[secondIndex], originalSelections, checkboxes);
 			}

@@ -66,9 +66,21 @@
 }
 
 .issue-details-created-container {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    display: flex;
+	justify-content: space-between;
+}
+
+.issue-details-info-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.issue-details-author-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .issue-items-label-container {
