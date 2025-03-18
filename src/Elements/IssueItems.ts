@@ -5,8 +5,12 @@ import { App } from "obsidian";
 import { Octokit } from "@octokit/core";
 import { getTextColor } from "../Utils/Color.utils";
 import { api_get_issue_details, Label } from "src/API/ApiHandler";
+import { IssueViewParams } from "src/main";
 
 export class IssueItems {
+
+	static view_params: IssueViewParams;
+
 	private static lastHighlightedIssue: HTMLElement | null = null;
 
 	/*
@@ -15,13 +19,9 @@ export class IssueItems {
 	 * @param issue - the issue to append
 	 * @param reponame - the name of the repo the issue is in
 	 */
-	public static createDefaultIssueElement(
-		el: HTMLElement,
-		issue: Issue,
-		repo_class_labels: ClassLabels,
-		ocotokit: Octokit,
-		app: App,
-	) {
+	public static createDefaultIssueElement( el: HTMLElement, issue: Issue,
+					repo_class_labels: ClassLabels, ocotokit: Octokit, app: App ) {
+
 		const container = el.createDiv({ cls: "issue-items-container" });
 
 		if (issue.findings.length > 0) {
@@ -46,8 +46,8 @@ export class IssueItems {
 		creatorText.classList.add("issue-items-creator-text");
 
 		let assignee_text = 'unassigned';
-		if (issue.assignee) {
-			assignee_text = `assigned to ${issue.assignee}`;
+		if (issue.assignees.length > 0) {
+			assignee_text = `assigned to ${issue.assignees.join("+")}`;
 		};
 		const assigneeText = detailsContainer.createEl("span", {text: assignee_text});
 		assigneeText.classList.add("issue-items-assignee-text");
@@ -84,18 +84,20 @@ export class IssueItems {
 		IssueItems.lastHighlightedIssue = container;
 	}
 
-	private static openIssueDetailsModal(app: App, container: HTMLDivElement, parent: HTMLElement, issue: Issue, repo_class_labels: ClassLabels, ocotokit: Octokit) {
+	private static openIssueDetailsModal(app: App, container: HTMLDivElement, parent: HTMLElement, 
+					issue: Issue, repo_class_labels: ClassLabels, ocotokit: Octokit) {
 		container.style.opacity = "0.5";
 		this.highlightIssue(container);
-		const modal = new IssuesDetailsModal(app, issue, repo_class_labels, ocotokit);
+		const modal = new IssuesDetailsModal(app, issue, IssueItems.view_params, repo_class_labels, ocotokit);
 		modal.onClose = async () => {
 			await IssueItems.reloadIssue(container, parent, issue, ocotokit, app);
 		};
 		modal.open();
 	}
 
-	private static async reloadIssue(container: HTMLElement, parent: HTMLElement, issue: Issue, ocotokit: Octokit, app: App) {
-		const updatedIssueDetail = await api_get_issue_details(ocotokit, issue);
+	private static async reloadIssue(container: HTMLElement, parent: HTMLElement, 
+							issue: Issue, ocotokit: Octokit, app: App) {
+		const updatedIssueDetail = await api_get_issue_details(ocotokit, IssueItems.view_params, issue);
 		if (updatedIssueDetail) {
 			if (updatedIssueDetail.state == "closed") {
 				console.log("removing #" + issue.number + " visibility in issue list");
@@ -108,7 +110,6 @@ export class IssueItems {
 				if (titleEl) {
 					titleEl.textContent = issue.title;
 					const labelContainer = titleEl.createDiv({ cls: "issue-items-label-container" });
-
 					allProperLabels(issue.cls).forEach((label) => {
 						const labelEl = labelContainer.createDiv({ cls: "issue-items-label" });
 						labelEl.style.backgroundColor = `#${label.color}`;
@@ -123,12 +124,13 @@ export class IssueItems {
 }
 
 
-export function createBadTaskAlert(
-	el: HTMLElement,
-	bt: string) 
-{
+export function createBadTaskAlert( el: HTMLElement, bt: string) {
 	const container = el.createDiv({ cls: "issue-items-container" });
 	container.classList.add("issue-findings");
 	const title = container.createEl("h6", { text: bt });
 	title.classList.add("issue-items-title");
+}
+
+export function setViewParameters(view_params: IssueViewParams) {
+	IssueItems.view_params = view_params;
 }

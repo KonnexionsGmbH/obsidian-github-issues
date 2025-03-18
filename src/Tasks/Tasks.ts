@@ -4,6 +4,15 @@ import { Editor, Notice } from "obsidian";
 import { IssueViewParams } from "../main";
 import { Octokit } from "@octokit/core";
 
+export interface MyTaskStatus {
+	symbol: string;	// e.g. "S"
+	name: string;	// e.g. "stoch working"
+	type: string;
+	nextStatusSymbol: string;
+	availableAsCommand: boolean;
+	user: string;	// e.g. "stoch"
+};
+
 /**
  * ClassLabels class (classified and ordered label structure)
  */
@@ -516,21 +525,6 @@ function renderTask(task: Task, view_params: IssueViewParams): string {
     return res;
 }
 
-function statusCodeFromAssignee( assignee: string ): string {
-    // simple hack which supports 25 contributors but their GitHub login must start with different letters
-    // need to peel out the user name from the task plugin configuration where the custom task states are named
-    // console.log( "Assignee to be inserted: ", a);
-    if (assignee != undefined) {
-        if (assignee.length > 0){
-            return assignee.slice(0,1).toLowerCase();
-        } else {
-            return " ";
-        }
-    } else {
-        return " ";
-    }
-}
-
 export function issueToForeignTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], 
         set_ids: Set<string>, set_titles: Set<string>) {
     // search for foreign tasks with this title and product combination
@@ -550,7 +544,7 @@ export function issueToForeignTaskSync(issue: Issue, view_params:IssueViewParams
  * @param set_titles 
  */
 export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, editor: Editor, facc: Feature[], 
-        set_ids: Set<string>, set_titles: Set<string>) {
+                task_states: MyTaskStatus[], set_ids: Set<string>, set_titles: Set<string>) {
     
     const tid_token = "🆔";
 
@@ -602,12 +596,12 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                             } else if ( t_task.cts.tid_tokens[0] != issue.cls.tid_labels[0].name ){ 
                                 findings.push('Task ID does not match the link in issue description.');
                             };
-
                             if (t_task.title != issue.title) {
                                 findings.push('Task title does not match the issue title.');
                             };
-                            if (t_task.status_code.toLowerCase().trim() != issue.assignee.charAt(0).toLowerCase()) {
-                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignee ${issue.assignee}.`);
+                            if (!issue.assignees.contains(loginFromStatus(t_task.status_code,task_states))) {
+                                const assignee_list = issue.assignees.join("+");
+                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignees ${assignee_list}.`);
                             };
                             if (t_task.cts.product_tokens.join() != issue.cls.product_labels.map(label => label.name).join()) {
                                 findings.push("Task product tags don't match issue product labels.");
@@ -660,8 +654,9 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                                     console.log(message);
                                 }
                             };
-                            if (t_task.status_code.toLowerCase().trim() != issue.assignee.charAt(0).toLowerCase()) {
-                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignee ${issue.assignee}.`);
+                            if (!issue.assignees.contains(loginFromStatus(t_task.status_code,task_states))) {
+                                const assignee_list = issue.assignees.join("+");
+                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignees ${assignee_list}.`);
                             };
                             if (t_task.cts.product_tokens.join() != issue.cls.product_labels.map(label => label.name).join()) {
                                 findings.push("Task product tags don't match issue product labels.");
@@ -698,7 +693,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                     // feature found and task not already inserted
                     t_start = facc[f].end; // new task goes to the end of the feature;
                     // Create task properties from the issue object. 
-                    const status_code = statusCodeFromAssignee(issue.assignee);
+                    const status_code = statusFromAssignees(issue.assignees, task_states);
                     const mapped_tokens: string[] = []; // 
                     issue.cls.feature_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
                     issue.cls.product_labels.map(label => label.name).forEach(token => mapped_tokens.push(token));
@@ -737,6 +732,33 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
     }
 }
 
+function loginFromStatus(status_code:string, task_states: MyTaskStatus[]): string {
+    if (status_code == " ") {
+        return ""       // unassigned
+    }
+    const logins = task_states.filter(ts => ts.symbol == status_code).map((ts) => ts.name.split(" ")[0]);
+    if (logins.length == 1) {
+        return logins[0]; 
+    } else {
+        return "";      // assume unassigned
+    }
+}
+
+function statusFromAssignees(assignees:string[], task_states: MyTaskStatus[]): string {
+    if (assignees.length == 0) {
+        return " ";     // unassigned
+    };
+    const stati = task_states.filter(ts => ts.name.split(" ")[0] == assignees[0]).map((ts) => ts.symbol);
+    if (stati.length == 1) {
+        return stati[0];
+    } else if ( (stati.length == 2) && (stati[0].toLowerCase() == stati[1].toLowerCase()) ) {
+        return stati[0].toLowerCase();
+    } else {
+        return "/";     // assume unknown assignee in progress
+    }
+}
+
+
 /**
  * Synchronizes assigned tasks (for active features) to issues, if possible.
  * Logs inconsistencies to be displayed for the user.
@@ -752,7 +774,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
  */
 export async function taskToIssueSync(task: Task, octokit: Octokit, view_params: IssueViewParams, 
         editor: Editor, issues: Issue[], iids: string[], bad_tasks_alerts: string[], 
-        user: string, set_ids: Set<string>) {
+        user: string, task_states: MyTaskStatus[], set_ids: Set<string>) {
 
     const status_obsolete = "xX-";
 
@@ -790,11 +812,11 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
     } else if (task.status_code > " ") {
         // task may need to be created as an issue in repo
 
-        let assignees = logins.filter(l => l.startsWith(task.status_code.toLowerCase()));
+        const login = loginFromStatus(task.status_code, task_states);
 
         // console.log(assignees);
 
-        if (assignees.length == 0) {           
+        if (!login) {           
             const message = "Cannot determine assignee from status code [" + task.status_code + "]";
             new Notice (message);
             console.log(message);
@@ -839,7 +861,7 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
                 {   title: task.title,
                     description: description,
                     labels: mapped_tokens,
-                    assignees: assignees
+                    assignees: [login]
                 } as SubmittableIssue
             );
 

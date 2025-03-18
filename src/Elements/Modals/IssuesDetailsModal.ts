@@ -4,6 +4,7 @@ import { Octokit } from "@octokit/core";
 import { getPasteableTimeDelta, reRenderView } from "../../Utils/Utils";
 import { loadingSpinner } from "../../Utils/Loader";
 import {
+	Assignee,
 	api_comment_on_issue,
 	api_get_issue_comments,
 	api_get_issue_details,
@@ -13,6 +14,23 @@ import {
 	Label
 } from "../../API/ApiHandler";
 import { getTextColor } from "../../Utils/Color.utils";
+import { IssueViewParams } from "src/main";
+
+function orderedAssignees(assignees: Assignee[] , logins: string[]): Assignee[] {
+	if (logins.length == 0) {
+		return assignees;
+	} else {
+		return assignees.sort((a1, a2) => {
+			if (logins.contains(a1.login)) {
+				return -1;
+			}
+			if (logins.contains(a2.login)) {
+				return 1;
+			}
+			return 0;
+		});
+	}
+}
 
 /**
  * Modal for seeing the issue details
@@ -21,12 +39,14 @@ export class IssuesDetailsModal extends Modal {
 	issue: Issue;
 	octokit: Octokit;
 	repo_class_labels: ClassLabels;
+	view_params: IssueViewParams;
 
-	constructor(app: App, issue: Issue, repo_class_labels: ClassLabels, octokit: Octokit) {
+	constructor(app: App, issue: Issue, view_params: IssueViewParams, repo_class_labels: ClassLabels, octokit: Octokit) {
 		super(app);
 		this.issue = issue;
 		this.repo_class_labels = repo_class_labels;
 		this.octokit = octokit;
+		this.view_params = view_params;
 	}
 
 	async onOpen() {
@@ -42,7 +62,7 @@ export class IssuesDetailsModal extends Modal {
 		//fetch the issue details
 		const spinner = loadingSpinner();
 		contentEl.appendChild(spinner);
-		const details = await api_get_issue_details(this.octokit, this.issue);
+		const details = await api_get_issue_details(this.octokit, this.view_params, this.issue);
 		spinner.remove();
 		if (!details) {
 			contentEl.createEl("h3", { text: "Could not fetch issue details" });
@@ -52,7 +72,7 @@ export class IssuesDetailsModal extends Modal {
 		this.showButtonOnInputChange(titleInput, saveTitleButton, details.title);
 
 		saveTitleButton.onclick = async () => {
-			const updated = await api_update_issue(this.octokit, this.issue, {
+			const updated = await api_update_issue(this.octokit, this.view_params, this.issue, {
 				title: titleInput.value
 			});
 			if (updated) {
@@ -65,22 +85,31 @@ export class IssuesDetailsModal extends Modal {
 
 		this.showButtonIfChanged(titleInput, saveTitleButton, details.title);
 
-
 		const createdContainer = contentEl.createDiv();
 		createdContainer.classList.add("issue-details-created-container");
-
 		const authorAndCreateDate = createdContainer.createSpan();
-		//author icon
-		const authorIcon = authorAndCreateDate.createEl("img");
-		authorIcon.classList.add("issue-details-assignee-icon")
-		authorIcon.src = details?.avatar_url;
-		//author login
-		const author = authorAndCreateDate.createSpan({
-			text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
-		});
+		if (details.is_pull_request) {
+			//PR icon
+			const prPill = authorAndCreateDate.createEl("span", { text: "PR"});
+			prPill.classList.add("issue-details-pr-pill")
+			prPill.style.backgroundColor = "rgba(205, 57, 23, 0.5)";
+			//author login
+			const author = authorAndCreateDate.createSpan({
+				text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
+			});
+		} else {
+			//author icon
+			const authorIcon = authorAndCreateDate.createEl("img");
+			authorIcon.classList.add("issue-details-assignee-icon")
+			authorIcon.src = details?.avatar_url;
+			//author login
+			const author = authorAndCreateDate.createSpan({
+				text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
+			});
+		}
 
-		const issueLink = createdContainer.createEl("a", { text: this.issue.view_params?.repo + ` #` + this.issue.number });
-		issueLink.setAttribute("href", "https://github.com/" + this.issue.view_params?.owner + "/" + this.issue.view_params?.repo + "/issues/" + this.issue.number);
+		const issueLink = createdContainer.createEl("a", { text: this.view_params?.repo + ` #` + this.issue.number });
+		issueLink.setAttribute("href", "https://github.com/" + this.view_params?.owner + "/" + this.view_params?.repo + "/issues/" + this.issue.number);
 		issueLink.classList.add("issue-details-link")
 
 		const assignedContainer = contentEl.createDiv();
@@ -88,17 +117,28 @@ export class IssuesDetailsModal extends Modal {
 		const assigneeIcon = assignedContainer.createEl("img");
 		assigneeIcon.classList.add("issue-details-assignee-icon");
 		let assignee_text = "";
-		if (details.assignee.login != undefined) {
-			if (details.assignee.login == this.issue.assignee) {
-				assignee_text = `Assigned to ${details.assignee.login}`;
-				assigneeIcon.src = details?.assignee.avatar_url;
+		const ordered_assignees = orderedAssignees(details.assignees, this.issue.assignees);
+		if ((details.assignees.length) && (this.issue.assignees.length)) {
+			// both sides have at least one assignee
+			const logins = details.assignees.map(a => a.login).join("+");
+			if (this.issue.assignees.contains(details.assignees[0].login)) {
+				assignee_text = `Assigned to ${logins}`;
+				assigneeIcon.src = details.assignees[0].avatar_url;
 				assignedContainer.classList.remove('issue-findings');
-			} else if (this.issue.assignee = "") {
-				assignee_text = `Unassign ${details.assignee.login}`;
+			} else if (details.assignees.map(a => a.login).contains(this.issue.assignees[0])) {
+				assignee_text = `Assigned to ${logins}`;
+				assigneeIcon.src = details.assignees[0].avatar_url;
+				assignedContainer.classList.remove('issue-findings');
+			} else {
+				assignee_text = `Assigned to ${logins}. Re-assign to ${this.issue.assignees[0]}`;
+				assigneeIcon.src = details.assignees[0].avatar_url;
 				assignedContainer.classList.add('issue-findings');
 			}
-		} else if (this.issue.assignee.length > 0) {
-			assignee_text = `Re-assign to ${this.issue.assignee}`;
+		} else if (this.issue.assignees.length) {
+			assignee_text = `Assign to ${this.issue.assignees[0]}`;
+			assignedContainer.classList.add('issue-findings');
+		} else if (details.assignees.length) {
+			assignee_text = `Unassign ${details.assignees[0].login}`;
 			assignedContainer.classList.add('issue-findings');
 		} else {
 			assignee_text = 'not assigned';
@@ -129,7 +169,7 @@ export class IssuesDetailsModal extends Modal {
 				color: label.color
 			} as Label;
 		})
-		const tl = new ClassLabels(mapped_labels, this.issue.view_params, this.issue.number, this.issue.description);
+		const tl = new ClassLabels(mapped_labels, this.view_params, this.issue.number, this.issue.description);
 		
 		//loop through the labels
 		// eslint-disable-next-line no-unsafe-optional-chaining
@@ -148,8 +188,8 @@ export class IssuesDetailsModal extends Modal {
 		const labelsGrid = contentEl.createDiv();
 		labelsGrid.classList.add("issue-details-labels-grid");
 
-		if (this.issue.view_params != null) {
-			const allLabels = this.repo_class_labels; // await api_get_labels(this.octokit, this.issue.view_params);
+		if (this.view_params != null) {
+			const allLabels = this.repo_class_labels; 
 			const originalSelections = new Set(details.labels.map(label => label.name));
 			const checkboxes: HTMLInputElement[] = [];
 
@@ -204,12 +244,12 @@ export class IssuesDetailsModal extends Modal {
 								...allLabels.foreign_labels,
 								...allLabels.product_labels];
 				const selectedLabels = Array.from(labelsGrid.querySelectorAll("input:checked")).map((checkbox: HTMLInputElement) => checkbox.value);
-				const updated = await api_set_labels_on_issue(this.octokit, this.issue, selectedLabels);
+				const updated = await api_set_labels_on_issue(this.octokit, this.view_params, this.issue, selectedLabels);
 				if (updated) {
 					new Notice("Labels updated");
 					this.issue.cls = new ClassLabels(
 						selectedLabels.map(label => { return { name: label, color: labels.find(l => l.name == label)?.color } as Label; })
-						, this.issue.view_params
+						, this.view_params
 						, this.issue.number, this.issue.description);
 					saveLabelsButton.classList.remove("visible");
 					// this.close();
@@ -286,7 +326,7 @@ export class IssuesDetailsModal extends Modal {
 		this.showButtonOnInputChange(descriptionInput, saveDescriptionButton, details.body);
 
 		saveDescriptionButton.onclick = async () => {
-			const updated = await api_update_issue(this.octokit, this.issue, {
+			const updated = await api_update_issue(this.octokit, this.view_params, this.issue, {
 				body: descriptionInput.value
 			});
 			if (updated) {
@@ -298,12 +338,14 @@ export class IssuesDetailsModal extends Modal {
 			}
 		}
 
-		this.showButtonIfChanged(descriptionInput, saveDescriptionButton, details.body);
+		if (this.showButtonIfChanged(descriptionInput, saveDescriptionButton, details.body)) {
+			console.log(descriptionInput, details.body);
+		}
 
 		//load the comments
 		const spinner2 = loadingSpinner();
 		contentEl.appendChild(spinner2);
-		const comments = await api_get_issue_comments(this.octokit, this.issue);
+		const comments = await api_get_issue_comments(this.octokit, this.view_params, this.issue);
 		spinner2.remove();
 		if (!comments) {
 			contentEl.createEl("h5", { text: "Could not fetch comments" });
@@ -325,7 +367,7 @@ export class IssuesDetailsModal extends Modal {
 			const authorName = authorContainer.createEl("span", { text: header_text });
 
 			const commentsBody = commentsContainer.createDiv();
-			commentsBody.classList.add("issue-details-comment-body")
+			commentsBody.classList.add("issue-details-comments-body")
 
 			const commentsText = commentsBody.createEl("span");
 			MarkdownRenderer.render(
@@ -371,7 +413,7 @@ export class IssuesDetailsModal extends Modal {
 		this.showButtonOnInputChange(commentInput, commentButton, "");
 
 		commentButton.onclick = async () => {
-			const updated = await api_comment_on_issue(this.octokit, this.issue, commentInput.value);
+			const updated = await api_comment_on_issue(this.octokit, this.view_params, this.issue, commentInput.value);
 			if (updated) {
 				new Notice("Issue comment posted");
 				commentButton.classList.remove("visible");
@@ -383,7 +425,7 @@ export class IssuesDetailsModal extends Modal {
 		this.showButtonIfChanged(commentInput, commentButton, "");
 
 		closeButton.onclick = async () => {
-			const updated = await api_update_issue(this.octokit, this.issue, {
+			const updated = await api_update_issue(this.octokit, this.view_params, this.issue, {
 				state: "closed"
 			});
 
@@ -397,15 +439,19 @@ export class IssuesDetailsModal extends Modal {
 
 	}
 
-	private showButtonIfChanged(input: HTMLTextAreaElement, button: HTMLButtonElement, initialValue: string) {
+	private showButtonIfChanged(input: HTMLTextAreaElement, button: HTMLButtonElement, initialValue: string): boolean {
 			if ( !(input.value) && !(initialValue) ) {
 				button.classList.remove("visible");
+				return false;
 			} else if (!(initialValue)) {
 				button.classList.add("visible");
+				return true;
 			} else if (input.value !== initialValue) {
 				button.classList.add("visible");
+				return true;
 			} else {
 				button.classList.remove("visible");
+				return false;
 			}
 	}
 

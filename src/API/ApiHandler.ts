@@ -27,30 +27,6 @@ export async function api_authenticate(token: string, base_url: string): Promise
 }
 
 /**
- * Returns all the repos of a user specified by the username (not yet used)
- * @param octokit
- */
-export async function api_get_repos(octokit: Octokit) {
-	const res = await octokit.request('GET /user/repos', {
-		headers: {
-			'X-GitHub-Api-Version': '2022-11-28'
-		}
-	})
-	// console.log(res.data);
-	//return an array of the repo names and ids
-	return res.data.map((repo) => {
-		return {
-			id: repo.id,
-			name: repo.name,
-			language: repo.language,
-			updated_at: repo.updated_at,
-			owner: repo.owner.login
-		} as RepoItem
-	}
-	);
-}
-
-/**
  * Creates new labels on GitHub
  * @param octokit
  * @param view_params
@@ -114,6 +90,7 @@ export async function api_submit_issue(octokit: Octokit, view_params: IssueViewP
 		repo: view_params.repo,
 		title: issue.title,
 		body: issue.description,
+		assignee: issue.assignees[0] ?? "",
 		assignees: issue.assignees, 
 		labels: issue.labels,
 		headers: {
@@ -133,16 +110,14 @@ export async function api_submit_issue(octokit: Octokit, view_params: IssueViewP
 			})
 			const description = res.data.body ?? "";
 			const tl = new ClassLabels(mapped_labels, view_params, res.data.number, "");
-			// console.log("Assignee login: ", issue.assignee?.login);
 			return [new Issue(
 				res.data.title,
 				description,
 				res.data.user?.login ?? "",
 				res.data.number,
 				res.data.created_at,
-				res.data.assignee?.login ?? "",
-				tl,
-				view_params
+				res.data.assignees?.map(a => a.login) ?? [],
+				tl
 			)];
 	} else {
 		return [];
@@ -178,7 +153,12 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 			const description = issue.body ?? "";
 			const tl = new ClassLabels(mapped_labels, view_params, issue.number, description);
 			if (tl.tid_labels.length > 1) {
-				console.log(tl);
+				console.log("multiple task labels detected for issue " + issue.number, tl);
+			}
+			let logins: string[] = [];
+			if (issue.assignees) {
+				logins = issue.assignees.map(a => a.login);
+				logins.reverse();
 			}
 			issues.push(new Issue(
 				issue.title,
@@ -186,9 +166,8 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 				issue.user?.login ?? "",
 				issue.number,
 				issue.created_at,
-				issue.assignee?.login ?? "",
-				tl,
-				view_params
+				logins,
+				tl
 			));
 		}
 
@@ -220,6 +199,10 @@ export async function api_get_issue_by_number(octokit: Octokit, view_params: Iss
 	})
 
 	if (res.status == 200) {
+		let ass: Assignee[] = [];
+		if (res.data.assignees) {
+			ass = res.data.assignees.map(a => { return {avatar_url: a.avatar_url, login: a.login} as Assignee })
+		}
 		return {
 			title: res.data.title,
 			body: res.data.body,
@@ -232,12 +215,9 @@ export async function api_get_issue_by_number(octokit: Octokit, view_params: Iss
 			state: res.data.state,
 			avatar_url: res.data.user?.avatar_url,
 			updated_at: res.data.updated_at,
-			assignee: {
-				avatar_url: res.data.assignee?.avatar_url,
-				login: res.data.assignee?.login
-			} as Assignee,
-			
-			comments: res.data.comments
+			assignees: ass,
+			comments: res.data.comments,
+			is_pull_request: (res.data.pull_request != undefined)
 		} as RepoDetails;
 	} else {
 		return null;
@@ -249,12 +229,12 @@ export async function api_get_issue_by_number(octokit: Octokit, view_params: Iss
  * @param octokit
  * @param issue
  */
-export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
-	if (issue.view_params.repo == null) return;
+export async function api_get_issue_details(octokit: Octokit, view_params: IssueViewParams, issue: Issue) {
+	if (view_params.repo == null) return;
 
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}', {
-		owner: issue.view_params.owner,
-		repo: issue.view_params.repo,
+		owner: view_params.owner,
+		repo: view_params.repo,
 		issue_number: issue.number,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
@@ -262,6 +242,10 @@ export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
 	})
 
 	if (res.status == 200) {
+		let ass: Assignee[] = [];
+		if (res.data.assignees) {
+			ass = res.data.assignees.map(a => { return {avatar_url: a.avatar_url, login: a.login} as Assignee })
+		}
 		return {
 			title: res.data.title,
 			body: res.data.body,
@@ -274,12 +258,9 @@ export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
 			state: res.data.state,
 			avatar_url: res.data.user?.avatar_url,
 			updated_at: res.data.updated_at,
-			assignee: {
-				avatar_url: res.data.assignee?.avatar_url,
-				login: res.data.assignee?.login
-			} as Assignee,
-			
-			comments: res.data.comments
+			assignees: ass,
+			comments: res.data.comments,
+			is_pull_request:  (res.data.pull_request != undefined)
 		} as RepoDetails;
 	} else {
 		return null;
@@ -292,11 +273,11 @@ export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
  * @param issue
  * @param comment
  */
-export async function api_comment_on_issue(octokit: Octokit, issue: Issue, comment: string) {
-	if (issue.view_params.repo == null) return;
+export async function api_comment_on_issue(octokit: Octokit, view_params: IssueViewParams, issue: Issue, comment: string) {
+	if (view_params.repo == null) return;
 	const res = await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-		owner: issue.view_params.owner,
-		repo: issue.view_params.repo,
+		owner: view_params.owner,
+		repo: view_params.repo,
 		issue_number: issue.number,
 		body: comment,
 		headers: {
@@ -313,11 +294,11 @@ export async function api_comment_on_issue(octokit: Octokit, issue: Issue, comme
  * @param issue
  * @param comment
  */
-export async function api_set_labels_on_issue(octokit: Octokit, issue: Issue, labels: string[]) {
-	if (issue.view_params.repo == null) return;
+export async function api_set_labels_on_issue(octokit: Octokit, view_params: IssueViewParams, issue: Issue, labels: string[]) {
+	if (view_params.repo == null) return;
 	const res = await octokit.request('PUT /repos/{owner}/{repo}/issues/{issue_number}/labels', {
-		owner: issue.view_params.owner,
-		repo: issue.view_params.repo,
+		owner: view_params.owner,
+		repo: view_params.repo,
 		issue_number: issue.number,
 		labels: labels,
 		headers: {
@@ -334,12 +315,12 @@ export async function api_set_labels_on_issue(octokit: Octokit, issue: Issue, la
  * @param issue
  * @param toBeUpdated
  */
-export async function api_update_issue(octokit: Octokit, issue: Issue, toBeUpdated: unknown) {
-	if (issue.view_params.repo == null) return;
+export async function api_update_issue(octokit: Octokit, view_params: IssueViewParams, issue: Issue, toBeUpdated: unknown) {
+	if (view_params.repo == null) return;
 
 	const options = {
-		owner: issue.view_params.owner,
-		repo: issue.view_params.repo,
+		owner: view_params.owner,
+		repo: view_params.repo,
 		issue_number: issue.number,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
@@ -358,11 +339,11 @@ export async function api_update_issue(octokit: Octokit, issue: Issue, toBeUpdat
  * @param octokit
  * @param issue
  */
-export async function api_get_issue_comments(octokit: Octokit, issue: Issue) {
-	if (issue.view_params.repo == null) return;
+export async function api_get_issue_comments(octokit: Octokit, view_params: IssueViewParams, issue: Issue) {
+	if (view_params.repo == null) return;
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-		owner: issue.view_params.owner,
-		repo: issue.view_params.repo,
+		owner: view_params.owner,
+		repo: view_params.repo,
 		issue_number: issue.number,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
@@ -405,6 +386,15 @@ export interface RepoItem {
 	owner: string;
 }
 
+export interface PullRequest {
+	url: string;
+}
+
+export interface Assignee {
+	avatar_url: string;
+	login: string;
+}
+
 export interface RepoDetails {
 	title: string;
 	avatar_url: string,
@@ -412,19 +402,14 @@ export interface RepoDetails {
 	labels: Label[];
 	state: string;
 	updated_at: string;
-	assignee: Assignee;
+	assignees: Assignee[];
 	comments: number;
+	is_pull_request: boolean; 
 }
 
 export interface Label {
 	name: string;
 	color: string;
-}
-
-export interface Assignee {
-	avatar_url: string;
-	login: string;
-
 }
 
 export interface SubmittableIssue {

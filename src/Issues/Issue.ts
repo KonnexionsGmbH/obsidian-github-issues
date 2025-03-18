@@ -112,7 +112,6 @@ export function allProperLabels(cls: ClassLabels): Label[] {
 			cls.other_labels).concat(
 			cls.foreign_labels).concat(
 			cls.product_labels);
-
 }
 
 /**
@@ -124,20 +123,18 @@ export class Issue {
 	description: string;
 	author: string | undefined;
 	created_at: string;
-	assignee: string;
+	assignees: string[];
 	cls: ClassLabels;
-    view_params: IssueViewParams;
 	sort_string: string = "";
 	findings: string[] = [];
 
-	constructor(t: string, d: string, a: string, n: number, created_at: string, ass: string, cls: ClassLabels, view_params: IssueViewParams) {
+	constructor(t: string, d: string, a: string, n: number, created_at: string, assignees: string[], cls: ClassLabels) {
 		this.title = t;
 		this.description = d;
 		this.author = a;
-		this.assignee = ass;
+		this.assignees = assignees;
 		this.number = n;
 		this.created_at = created_at;
-        this.view_params = view_params;
 		this.cls = cls;
 	}
 }
