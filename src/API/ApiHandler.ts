@@ -117,7 +117,8 @@ export async function api_submit_issue(octokit: Octokit, view_params: IssueViewP
 				res.data.number,
 				res.data.created_at,
 				res.data.assignees?.map(a => a.login) ?? [],
-				tl
+				tl,
+				false
 			)];
 	} else {
 		return [];
@@ -153,7 +154,7 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 			const description = issue.body ?? "";
 			const tl = new ClassLabels(mapped_labels, view_params, issue.number, description);
 			if (tl.tid_labels.length > 1) {
-				console.log("multiple task labels detected for issue " + issue.number, tl);
+				console.log("Multiple task labels detected for issue " + issue.number, tl);
 			}
 			let logins: string[] = [];
 			if (issue.assignees) {
@@ -167,7 +168,8 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 				issue.number,
 				issue.created_at,
 				logins,
-				tl
+				tl,
+				(issue.pull_request != undefined)
 			));
 		}
 

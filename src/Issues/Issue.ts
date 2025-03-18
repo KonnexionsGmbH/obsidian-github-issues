@@ -125,10 +125,11 @@ export class Issue {
 	created_at: string;
 	assignees: string[];
 	cls: ClassLabels;
+	is_pull_request: boolean;
 	sort_string: string = "";
 	findings: string[] = [];
 
-	constructor(t: string, d: string, a: string, n: number, created_at: string, assignees: string[], cls: ClassLabels) {
+	constructor(t: string, d: string, a: string, n: number, created_at: string, assignees: string[], cls: ClassLabels, is_pull_request = false) {
 		this.title = t;
 		this.description = d;
 		this.author = a;
@@ -136,6 +137,7 @@ export class Issue {
 		this.number = n;
 		this.created_at = created_at;
 		this.cls = cls;
+		this.is_pull_request = is_pull_request;
 	}
 }
 

@@ -548,14 +548,16 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
     
     const tid_token = "🆔";
 
-    if (issue.cls.feature_labels.length > 1) {
+    if (issue.cls.priority_labels.length > 1) {
+        issue.findings.push('Issue cannot have more than one priority label');
+    } else if (issue.cls.product_labels.length == 0) {
+        issue.findings.push('Issue should have one or more product labels which are managed in this repo');
+    } else if (issue.is_pull_request) {
+        // OK, do not sync
+    } else if (issue.cls.feature_labels.length > 1) {
         issue.findings.push('Issue cannot have more than one feature label');
     } else if (issue.cls.feature_labels.length == 0) {
         issue.findings.push('Issue can only be synced to Obsidian with a feature label');
-    } else if (issue.cls.priority_labels.length > 1) {
-        issue.findings.push('Issue cannot have more than one priority label');
-    } else if (issue.cls.product_labels.length == 0) {
-        issue.findings.push('Issue must have one or more product labels which are managed in this repo');
     } else if (issue.cls.iid_labels.length == 1) {
 
         let findings: string[] = [];
@@ -599,9 +601,11 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                             if (t_task.title != issue.title) {
                                 findings.push('Task title does not match the issue title.');
                             };
-                            if (!issue.assignees.contains(loginFromStatus(t_task.status_code,task_states))) {
+                            if ((issue.assignees.length == 0) && (t_task.status_code == " ")) {
+                                // unassigned, ok 
+                            } else if (!issue.assignees.contains(loginFromStatus(t_task.status_code, task_states))) {
                                 const assignee_list = issue.assignees.join("+");
-                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignees ${assignee_list}.`);
+                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignees [${assignee_list}].`);
                             };
                             if (t_task.cts.product_tokens.join() != issue.cls.product_labels.map(label => label.name).join()) {
                                 findings.push("Task product tags don't match issue product labels.");
@@ -654,9 +658,11 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                                     console.log(message);
                                 }
                             };
-                            if (!issue.assignees.contains(loginFromStatus(t_task.status_code,task_states))) {
+                            if ((issue.assignees.length == 0) && (t_task.status_code == " ")) {
+                                // unassigned, ok 
+                            } else if (!issue.assignees.contains(loginFromStatus(t_task.status_code,task_states))) {
                                 const assignee_list = issue.assignees.join("+");
-                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignees ${assignee_list}.`);
+                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignees [${assignee_list}].`);
                             };
                             if (t_task.cts.product_tokens.join() != issue.cls.product_labels.map(label => label.name).join()) {
                                 findings.push("Task product tags don't match issue product labels.");
@@ -852,9 +858,7 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
                     mapped_tokens.push(token);
                 });
             }
-
-            // console.log(["New issue to be created: ", task.cts.feature_tokens[0], "/", task.title, "/"].join(" "));
-            
+           
             let new_issues: Issue[] = await api_submit_issue(
                 octokit,
                 view_params,

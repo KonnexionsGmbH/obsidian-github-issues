@@ -91,7 +91,7 @@ export class IssuesDetailsModal extends Modal {
 		if (details.is_pull_request) {
 			//PR icon
 			const prPill = authorAndCreateDate.createEl("span", { text: "PR"});
-			prPill.classList.add("issue-details-pr-pill")
+			prPill.classList.add("issue-details-pr-pill");
 			prPill.style.backgroundColor = "rgba(205, 57, 23, 0.5)";
 			//author login
 			const author = authorAndCreateDate.createSpan({
@@ -169,7 +169,7 @@ export class IssuesDetailsModal extends Modal {
 				color: label.color
 			} as Label;
 		})
-		const tl = new ClassLabels(mapped_labels, this.view_params, this.issue.number, this.issue.description);
+		const tl = new ClassLabels(mapped_labels, this.view_params, this.issue.number, "" + this.issue.description);
 		
 		//loop through the labels
 		// eslint-disable-next-line no-unsafe-optional-chaining
@@ -250,7 +250,7 @@ export class IssuesDetailsModal extends Modal {
 					this.issue.cls = new ClassLabels(
 						selectedLabels.map(label => { return { name: label, color: labels.find(l => l.name == label)?.color } as Label; })
 						, this.view_params
-						, this.issue.number, this.issue.description);
+						, this.issue.number, "" + this.issue.description);
 					saveLabelsButton.classList.remove("visible");
 					// this.close();
 				} else {

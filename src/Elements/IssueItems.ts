@@ -40,6 +40,11 @@ export class IssueItems {
 			tid = " " + issue.cls.tid_labels[0].name;
 		};
 
+		if (issue.is_pull_request) {
+			const prPill = detailsContainer.createEl("span", { text: " PR" });
+			prPill.classList.add("issue-details-pr-pill");
+			prPill.style.backgroundColor = "rgba(205, 57, 23, 0.5)";
+		}
 		const creatorText = detailsContainer.createEl("span", {
 			text: `#${issue.number}${tid} opened ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`
 		});
