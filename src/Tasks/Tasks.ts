@@ -84,7 +84,7 @@ export class Task {
     description: string;        // optional markdown multi-line task description
     cts: ClassTokens;           // feature, product, id, priority, other (date/link) tags
     sort_string: string;
-    status_code: string;        // " ": todo, "x":done, "s": assigned Sven, "S": working Sven, etc.
+    status_code: string;        // " ": todo, "x":done, "s": Sven assigned, "S": Sven working, etc.
 
     constructor(start: number, end: number, t: string, d: string, cts: ClassTokens, sort: string, status: string) {
         this.start = start;
