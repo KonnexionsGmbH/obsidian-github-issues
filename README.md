@@ -18,8 +18,11 @@ Obsidian GitHub Issues is a plugin for the Obsidian note-taking app that enables
 
 ## Installation
 
--   Install, enable and configure the Tasks plugin. Configure two custom tasks states per co-worker in all repos:
-  e.g.   [a] for "assigned Alex"  and [A] for "working Alex"  etc. 
+-   Install, enable and configure the Tasks plugin. Configure two custom tasks states per co-worker (e.g.):
+   [a] for "alex_avatar assigned"  and
+   [A] for "alex_avatar working"  etc.  
+   
+   This will allow to mark tasks as being worked on but this information is not forwarded to GitHub. The sync process only makes sure that the assigned person is among the assignees in GitHub.
 
 ### Prerequisites
 
