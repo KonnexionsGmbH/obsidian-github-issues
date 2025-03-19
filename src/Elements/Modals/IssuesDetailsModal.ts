@@ -86,41 +86,36 @@ export class IssuesDetailsModal extends Modal {
 		this.showButtonIfChanged(titleInput, saveTitleButton, details.title);
 
 		const createdContainer = contentEl.createDiv();
-		createdContainer.classList.add("issue-details-created-container");
-
 		// Create a single line container with space-between
-		const infoLineContainer = createdContainer.createSpan();
-		infoLineContainer.classList.add("issue-details-info-line");
-
+		const createdLineContainer = createdContainer.createSpan();
+		createdLineContainer.classList.add("issue-details-info-line");
 		// Left group for author info
-		const authorGroup = infoLineContainer.createSpan();
+		const authorGroup = createdLineContainer.createSpan();
 		authorGroup.classList.add("issue-details-author-group");
-
 		if (details.is_pull_request) {
-			const prPill = authorGroup.createEl("span", { text: "PR" });
+			const prPill = authorGroup.createSpan({ text: "PR" });
 			prPill.classList.add("issue-details-pr-pill");
 			prPill.style.backgroundColor = "rgba(205, 57, 23, 0.5)";
-			authorGroup.createSpan({
-				text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
-			});
+			authorGroup.createSpan({text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`});
 		} else {
 			const authorIcon = authorGroup.createEl("img");
-			authorIcon.classList.add("issue-details-assignee-icon")
+			authorIcon.classList.add("issue-details-fold-button")
 			authorIcon.src = details?.avatar_url;
-			authorGroup.createSpan({
-				text: `Created by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`
-			});
+			authorGroup.createSpan({text: `Opened by ${this.issue.author} ${getPasteableTimeDelta(this.issue.created_at)}`});
 		}
-
 		// Right-aligned issue link
-		const issueLink = infoLineContainer.createEl("a", { text: this.view_params?.repo + ` #` + this.issue.number });
+		const issueLink = createdLineContainer.createEl("a", { text: this.view_params?.repo + ` #` + this.issue.number });
 		issueLink.setAttribute("href", "https://github.com/" + this.view_params?.owner + "/" + this.view_params?.repo + "/issues/" + this.issue.number);
-		issueLink.classList.add("issue-details-link");
 
-		const assignedContainer = contentEl.createDiv();
-		// asignee login / icon
-		const assigneeIcon = assignedContainer.createEl("img");
-		assigneeIcon.classList.add("issue-details-assignee-icon");
+		const assigneeContainer = contentEl.createDiv();
+		// Create a single line container with space-between
+		const assigneeLineContainer = assigneeContainer.createSpan();
+		assigneeLineContainer.classList.add("issue-details-info-line");
+		// Left group for author info
+		const assigneeGroup = assigneeLineContainer.createSpan();
+		assigneeGroup.classList.add("issue-details-author-group");
+		const assigneeIcon = assigneeGroup.createEl("img");
+		assigneeIcon.classList.add("issue-details-fold-button");
 		let assignee_text = "";
 		const ordered_assignees = orderedAssignees(details.assignees, this.issue.assignees);
 		if ((details.assignees.length) && (this.issue.assignees.length)) {
@@ -129,27 +124,33 @@ export class IssuesDetailsModal extends Modal {
 			if (this.issue.assignees.contains(details.assignees[0].login)) {
 				assignee_text = `Assigned to ${logins}`;
 				assigneeIcon.src = details.assignees[0].avatar_url;
-				assignedContainer.classList.remove('issue-findings');
+				assigneeContainer.classList.remove('issue-findings');
 			} else if (details.assignees.map(a => a.login).contains(this.issue.assignees[0])) {
 				assignee_text = `Assigned to ${logins}`;
 				assigneeIcon.src = details.assignees[0].avatar_url;
-				assignedContainer.classList.remove('issue-findings');
+				assigneeContainer.classList.remove('issue-findings');
 			} else {
 				assignee_text = `Assigned to ${logins}. Re-assign to ${this.issue.assignees[0]}`;
 				assigneeIcon.src = details.assignees[0].avatar_url;
-				assignedContainer.classList.add('issue-findings');
+				assigneeContainer.classList.add('issue-findings');
 			}
 		} else if (this.issue.assignees.length) {
 			assignee_text = `Assign to ${this.issue.assignees[0]}`;
-			assignedContainer.classList.add('issue-findings');
+			assigneeContainer.classList.add('issue-findings');
 		} else if (details.assignees.length) {
 			assignee_text = `Unassign ${details.assignees[0].login}`;
-			assignedContainer.classList.add('issue-findings');
+			assigneeContainer.classList.add('issue-findings');
 		} else {
 			assignee_text = 'not assigned';
-			assignedContainer.classList.remove('issue-findings');
+			assigneeContainer.classList.remove('issue-findings');
 		}
-		const assignee = assignedContainer.createSpan({ text: assignee_text });
+		assigneeGroup.createSpan({ text: assignee_text });
+		// Right-aligned fold button
+		const foldAssigneesButton = assigneeLineContainer.createEl("button", { text: ">" });
+		foldAssigneesButton.classList.add("issue-labels-fold-button");
+
+		const assigneeGrid = contentEl.createDiv();
+		assigneeGrid.classList.add("issue-details-labels-grid");
 
 		const stateAndLabelsContainer = contentEl.createDiv();
 		stateAndLabelsContainer.classList.add("issue-details-label-pill");
@@ -343,10 +344,6 @@ export class IssuesDetailsModal extends Modal {
 			}
 		}
 
-		if (this.showButtonIfChanged(descriptionInput, saveDescriptionButton, details.body)) {
-			console.log(descriptionInput, details.body);
-		}
-
 		//load the comments
 		const spinner2 = loadingSpinner();
 		contentEl.appendChild(spinner2);
@@ -455,7 +452,6 @@ export class IssuesDetailsModal extends Modal {
 	private showButtonIfChanged(input: HTMLTextAreaElement, button: HTMLButtonElement, initialValue: string): boolean {
 		const normalizedInput = this.normalizeText(input.value);
 		const normalizedInitial = this.normalizeText(initialValue);
-		debugger;
 		if (!normalizedInput && !normalizedInitial) {
 			button.classList.remove("visible");
 			return false;

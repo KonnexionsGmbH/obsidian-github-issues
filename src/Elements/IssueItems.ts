@@ -31,31 +31,32 @@ export class IssueItems {
 		const title = container.createEl("h6", { text: issue.title });
 		title.classList.add("issue-items-title");
 
-		const details = container.createDiv();
-		const detailsContainer = details.createDiv();
+		const detailsContainer = container.createDiv();
 		detailsContainer.classList.add("issue-items-details-container");
-
-		let tid = "";
-		if (issue.cls.tid_labels.length > 0) {
-			tid = " " + issue.cls.tid_labels[0].name;
-		};
-
+		// Create a single line container with space-between
+		const detailsLineContainer = detailsContainer.createSpan();
+		detailsLineContainer.classList.add("issue-details-info-line");
+		// Left group for author info
+		const authorGroup = detailsLineContainer.createSpan();
+		authorGroup.classList.add("issue-details-author-group");
 		if (issue.is_pull_request) {
-			const prPill = detailsContainer.createEl("span", { text: " PR" });
+			const prPill = authorGroup.createSpan({ text: "PR" });
 			prPill.classList.add("issue-details-pr-pill");
 			prPill.style.backgroundColor = "rgba(205, 57, 23, 0.5)";
+			authorGroup.createSpan({text: `#${issue.number} created ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`});
+		} else {
+			let tid = "";
+			if (issue.cls.tid_labels.length > 0) {
+				tid = " " + issue.cls.tid_labels[0].name;
+			};
+			authorGroup.createSpan({text: `#${issue.number}${tid} opened ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`});
 		}
-		const creatorText = detailsContainer.createEl("span", {
-			text: `#${issue.number}${tid} opened ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`
-		});
-		creatorText.classList.add("issue-items-creator-text");
-
+		// Right-aligned issue link
 		let assignee_text = 'unassigned';
 		if (issue.assignees.length > 0) {
 			assignee_text = `assigned to ${issue.assignees.join("+")}`;
 		};
-		const assigneeText = detailsContainer.createEl("span", {text: assignee_text});
-		assigneeText.classList.add("issue-items-assignee-text");
+		const assigneeText = detailsLineContainer.createEl("span", {text: assignee_text});
 
 		const labelContainer = title.createDiv({ cls: "issue-items-label-container" });
 

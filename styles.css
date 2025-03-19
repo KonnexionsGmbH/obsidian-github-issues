@@ -60,16 +60,6 @@
 	border-radius: 50%;
 }
 
-.issue-details-link {
-	padding-top: 10px;
-	text-align: right;
-}
-
-.issue-details-created-container {
-    display: flex;
-	justify-content: space-between;
-}
-
 .issue-details-info-line {
     display: flex;
     justify-content: space-between;
@@ -152,15 +142,11 @@
 
 .issue-details-pr-pill {
 	color: white;
-	/* display: flex;*/
-	/* flex-direction: row; */
-	/* padding: 2px; */
 	align-items: center;
 	height: 20px;
 	width: 20px;
 	border-radius: 10px;
-	margin: 5px 0 0;
-	margin-inline-end: 5px;
+	margin: 0px 2px 0 0;
 	padding: 3px;
 	gap: 5px;
 }
@@ -170,13 +156,15 @@
 	margin: 0;
 }
 
-.issue-details-assignee-icon {
+.issue-details-fold-button {
 	width: 20px;
 	height: 20px;
 	border-radius: 10px;
-	margin: 5px 0 0;
-	margin-inline-end: 5px;
-	padding: 0;
+	margin: 0px 5px 0 0;
+	margin-inline-end: 2px;
+	padding: 0; 
+	align-items: center;
+	gap: 5px;
 }
 
 .selectable-text * {
@@ -427,12 +415,12 @@
 
 .issue-labels-fold-button {
 	margin-left: auto;
-    margin-top: 25px;
+    margin-top: 10px;
     display: flex;
     justify-content: flex-end;
 	opacity: 1;
-	height: 22px;
-    transform: translateY(-10px);
+	height: 20px;
+    transform: translateY(-5px);
 	vertical-align: middle;
 }
 
