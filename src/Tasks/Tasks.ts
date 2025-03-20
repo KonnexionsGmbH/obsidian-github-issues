@@ -41,12 +41,8 @@ export class ClassTokens {
         this.tid_tokens = [];
 
         const sorted_tokens = mapped_tokens.sort((t1,t2) => {
-            if (t1 > t2) {
-                return 1;
-            }
-            if (t1 < t2) {
-                return -1;
-            }
+            if (t1 > t2) return 1;
+            if (t1 < t2) return -1;
             return 0;
         });
 
@@ -396,12 +392,8 @@ export function sortAndPruneTasksNote(editor: Editor, facc: Feature[], view_para
         let idx = r_start;  // start index for next task
         facc[f].start = facc[f].start + line_shift;
         facc[f].tasks.sort((t1, t2) => {
-            if (t1.sort_string > t2.sort_string) {
-                return 1;
-            }
-            if (t1.sort_string < t2.sort_string) {
-                return -1;
-            }
+            if (t1.sort_string > t2.sort_string) return 1;
+            if (t1.sort_string < t2.sort_string) return -1;
             return 0;
         });
         for (let t = 0; t < facc[f].tasks.length; t++) {
@@ -741,6 +733,10 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
 function loginFromStatus(status_code:string, task_states: MyTaskStatus[]): string {
     if (status_code == " ") {
         return ""       // unassigned
+    } else if (status_code == "/") {
+        return "*"      // external, does not matter
+    } else if (status_code == "-") {
+        return "*"      // cancelled, does not matter
     }
     const logins = task_states.filter(ts => ts.symbol == status_code).map((ts) => ts.name.split(" ")[0]);
     if (logins.length == 1) {

@@ -9,24 +9,22 @@ import {
 	api_get_issue_comments,
 	api_get_issue_details,
 	api_update_issue,
-	api_get_labels,
 	api_set_labels_on_issue,
+	api_add_assignees_to_issue,
+	api_remove_assignees_from_issue,
 	Label
 } from "../../API/ApiHandler";
 import { getTextColor } from "../../Utils/Color.utils";
 import { IssueViewParams } from "src/main";
+import { MyTaskStatus } from "../../Tasks/Tasks";
 
 function orderedAssignees(assignees: Assignee[], logins: string[]): Assignee[] {
 	if (logins.length == 0) {
 		return assignees;
 	} else {
 		return assignees.sort((a1, a2) => {
-			if (logins.contains(a1.login)) {
-				return -1;
-			}
-			if (logins.contains(a2.login)) {
-				return 1;
-			}
+			if (logins.contains(a1.login)) return -1;
+			if (logins.contains(a2.login)) return 1;
 			return 0;
 		});
 	}
@@ -40,13 +38,15 @@ export class IssuesDetailsModal extends Modal {
 	octokit: Octokit;
 	repo_class_labels: ClassLabels;
 	view_params: IssueViewParams;
+	task_states: MyTaskStatus[];
 
-	constructor(app: App, issue: Issue, view_params: IssueViewParams, repo_class_labels: ClassLabels, octokit: Octokit) {
+	constructor(app: App, issue: Issue, view_params: IssueViewParams, task_states: MyTaskStatus[], repo_class_labels: ClassLabels, octokit: Octokit) {
 		super(app);
 		this.issue = issue;
 		this.repo_class_labels = repo_class_labels;
 		this.octokit = octokit;
 		this.view_params = view_params;
+		this.task_states = task_states;
 	}
 
 	async onOpen() {
@@ -117,23 +117,34 @@ export class IssuesDetailsModal extends Modal {
 		const assigneeIcon = assigneeGroup.createEl("img");
 		assigneeIcon.classList.add("issue-details-fold-button");
 		let assignee_text = "";
+		let assignees_in_sync= false;
 		const ordered_assignees = orderedAssignees(details.assignees, this.issue.assignees);
 		if ((details.assignees.length) && (this.issue.assignees.length)) {
 			// both sides have at least one assignee
 			const logins = details.assignees.map(a => a.login).join("+");
-			if (this.issue.assignees.contains(details.assignees[0].login)) {
+			if (this.issue.assignees.contains("*")) {
 				assignee_text = `Assigned to ${logins}`;
 				assigneeIcon.src = details.assignees[0].avatar_url;
 				assigneeContainer.classList.remove('issue-findings');
+				assignees_in_sync = true;
+			} else if (this.issue.assignees.contains(details.assignees[0].login)) {
+				assignee_text = `Assigned to ${logins}`;
+				assigneeIcon.src = details.assignees[0].avatar_url;
+				assigneeContainer.classList.remove('issue-findings');
+				assignees_in_sync = true;
 			} else if (details.assignees.map(a => a.login).contains(this.issue.assignees[0])) {
 				assignee_text = `Assigned to ${logins}`;
 				assigneeIcon.src = details.assignees[0].avatar_url;
 				assigneeContainer.classList.remove('issue-findings');
+				assignees_in_sync = true;
 			} else {
 				assignee_text = `Assigned to ${logins}. Re-assign to ${this.issue.assignees[0]}`;
 				assigneeIcon.src = details.assignees[0].avatar_url;
 				assigneeContainer.classList.add('issue-findings');
 			}
+		} else if ((this.issue.assignees.length) && (this.issue.assignees.contains("*"))) {
+			assignee_text = `Assignable to ${this.issue.assignees.join("+")}`;
+			assigneeContainer.classList.remove('issue-findings');
 		} else if (this.issue.assignees.length) {
 			assignee_text = `Assign to ${this.issue.assignees[0]}`;
 			assigneeContainer.classList.add('issue-findings');
@@ -143,6 +154,7 @@ export class IssuesDetailsModal extends Modal {
 		} else {
 			assignee_text = 'not assigned';
 			assigneeContainer.classList.remove('issue-findings');
+			assignees_in_sync = true;
 		}
 		assigneeGroup.createSpan({ text: assignee_text });
 		// Right-aligned fold button
@@ -152,9 +164,101 @@ export class IssuesDetailsModal extends Modal {
 		const assigneeGrid = contentEl.createDiv();
 		assigneeGrid.classList.add("issue-details-labels-grid");
 
+		const allAssignees = this.task_states.map( ts => ts.name.split(" ")[0]).sort((t1,t2) => {
+            if (t1 > t2) return 1;
+            if (t1 < t2) return -1;
+            return 0;
+        });
+		if (allAssignees.length > 0) {
+			const originalAssignees = new Set(details.assignees.map(a => a.login));
+			const proposedAssignees = new Set(this.issue.assignees.filter(a => a != "*"));
+			const checkboxes: HTMLInputElement[] = [];
+			this.appendAssigneeCheckboxes(assigneeGrid, proposedAssignees, allAssignees, checkboxes);
+			const saveAssigneesButton = contentEl.createEl("button", { text: "Save Assignees" });
+			saveAssigneesButton.classList.add("issue-details-save-button");
+
+			const checkForChanges = () => {
+				const currentAssignees = new Set(
+					checkboxes
+						.filter(cb => cb.checked)
+						.map(cb => cb.value)
+				);
+
+				const hasChanges =
+					originalAssignees.size !== currentAssignees.size ||
+					![...originalAssignees].every(ass => currentAssignees.has(ass));
+
+				if (hasChanges) {
+					saveAssigneesButton.classList.add("visible");
+				} else {
+					saveAssigneesButton.classList.remove("visible");
+				}
+			};			
+
+			checkboxes.forEach(checkbox => {
+				checkbox.addEventListener("change", checkForChanges);
+			});
+
+			foldAssigneesButton.onclick = async () => {
+				if (foldAssigneesButton.textContent == ">") {
+					foldAssigneesButton.textContent = "v";
+					assigneeGrid.style.display = "block"
+				} else {
+					foldAssigneesButton.textContent = ">";
+					assigneeGrid.style.display = "none"
+				}
+			}
+
+			assigneeGrid.style.display = "none";
+
+			saveAssigneesButton.onclick = async () => {
+				const selectedAssignees = Array.from(assigneeGrid.querySelectorAll("input:checked")).map((checkbox: HTMLInputElement) => checkbox.value);
+				const newAssignees = new Set([...selectedAssignees].filter(x => !originalAssignees.has(x)));
+				const removedAssignees = new Set([...originalAssignees].filter(x => !selectedAssignees.contains(x)));
+				let added: boolean | undefined = true;
+				let removed: boolean | undefined = true;
+				if (newAssignees.size) {
+					added = await api_add_assignees_to_issue(
+									this.octokit, this.view_params, 
+									this.issue, [...newAssignees]);
+					if (added) {
+						const text = `${[...newAssignees].join("/")} assigned`;
+						new Notice(text);
+						console.log(text);
+					} else {
+						const text = `${[...newAssignees].join("/")} could not be assigned`;
+						new Notice(text);
+						console.log(text);
+					}
+				}
+
+				if (removedAssignees.size) {
+					removed = await api_remove_assignees_from_issue(
+									this.octokit, this.view_params, 
+									this.issue, [...removedAssignees]);
+					if (removed) {
+						const text = `${[...removedAssignees].join("/")} de-assigned`;
+						new Notice(text);
+						console.log(text);
+					} else {
+						const text = `${[...removedAssignees].join("/")} could not be de-assigned`;
+						new Notice(text);
+						console.log(text);
+					}
+				}
+
+				if (added) {
+					this.issue.assignees = selectedAssignees;
+					if (removed) {
+						saveAssigneesButton.classList.remove("visible");
+					}
+				}				
+			}
+		}
+
 		const stateAndLabelsContainer = contentEl.createDiv();
 		stateAndLabelsContainer.classList.add("issue-details-label-pill");
-
+		// Create a single line container for state and labels pills
 		const statePill = stateAndLabelsContainer.createDiv();
 		statePill.classList.add("issue-details-label-pill")
 		if (details?.state === "open") {
@@ -162,7 +266,6 @@ export class IssuesDetailsModal extends Modal {
 		} else {
 			statePill.style.backgroundColor = "rgba(116, 58, 222, 0.5)";
 		}
-
 		const state = statePill.createEl("span", { text: details?.state });
 		state.classList.add("issue-details-label-name");
 
@@ -258,7 +361,6 @@ export class IssuesDetailsModal extends Modal {
 						, this.view_params
 						, this.issue.number, "" + this.issue.description);
 					saveLabelsButton.classList.remove("visible");
-					// this.close();
 				} else {
 					new Notice("Could not update labels");
 				}
@@ -467,6 +569,27 @@ export class IssuesDetailsModal extends Modal {
 		});
 	}
 
+	private appendAssigneeCheckboxes(
+		assigneeGrid: HTMLElement,
+		proposedAssignees: Set<String>,
+		allAssignees: string[],
+		checkboxes: HTMLElement[]
+	) {
+		for (let i = 0; i < Math.floor((allAssignees.length + 1) / 2); i++) {
+			const row = assigneeGrid.createDiv();
+			row.classList.add(i === 0 ? "issue-details-labels-row-first" : "issue-details-labels-row");
+
+			// First label
+			this.createAssigneeElement(row, allAssignees[i], proposedAssignees, checkboxes);
+
+			// Second label (if exists)
+			const secondIndex = i + Math.floor((allAssignees.length + 1) / 2);
+			if (secondIndex < allAssignees.length) {
+				this.createAssigneeElement(row, allAssignees[secondIndex], proposedAssignees, checkboxes);
+			}
+		}
+	}
+
 	private appendLabelCheckboxes(
 		labelsGrid: HTMLElement,
 		originalSelections: Set<String>,
@@ -485,7 +608,6 @@ export class IssuesDetailsModal extends Modal {
 			if (secondIndex < labels.length) {
 				this.createLabelElement(row, labels[secondIndex], originalSelections, checkboxes);
 			}
-
 		}
 	}
 
@@ -513,6 +635,29 @@ export class IssuesDetailsModal extends Modal {
 		labelPill.classList.add("issue-details-label-pill");
 		labelPill.style.background = `#${label.color}`;
 		labelPill.style.color = getTextColor(label.color);
+	}
+
+	private createAssigneeElement(
+		container: HTMLElement,
+		assignee: string,
+		proposedAssignees: Set<String>,
+		checkboxes: HTMLElement[]
+	): void {
+		const assigneeContainer = container.createDiv();
+		assigneeContainer.classList.add("issue-details-label-grid-container");
+
+		const assigneeCheckbox = assigneeContainer.createEl("input", {
+			type: "checkbox",
+			value: assignee,
+			attr: { id: `assignee-${assignee}` }
+		});
+		assigneeCheckbox.checked = proposedAssignees.has(assignee);
+		checkboxes.push(assigneeCheckbox);
+
+		const assigneeText = assigneeContainer.createEl("span", {
+			text: assignee,
+			attr: { for: `assignee-${assignee}` }
+		});
 	}
 
 }

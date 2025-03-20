@@ -90,7 +90,6 @@ export async function api_submit_issue(octokit: Octokit, view_params: IssueViewP
 		repo: view_params.repo,
 		title: issue.title,
 		body: issue.description,
-		assignee: issue.assignees[0] ?? "",
 		assignees: issue.assignees, 
 		labels: issue.labels,
 		headers: {
@@ -303,6 +302,51 @@ export async function api_set_labels_on_issue(octokit: Octokit, view_params: Iss
 		repo: view_params.repo,
 		issue_number: issue.number,
 		labels: labels,
+		headers: {
+			'X-GitHub-Api-Version': '2022-11-28'
+		}
+	})
+
+	return res.status == 200;
+}
+
+/**
+ * Adds assignees to an existing issue object
+ * @param octokit 
+ * @param view_params 
+ * @param issue 
+ * @param assignees 
+ */
+export async function api_add_assignees_to_issue(octokit: Octokit, view_params: IssueViewParams, issue: Issue, assignees:string[]) {
+	if (view_params.repo == null) return;
+	const res = await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
+		owner: view_params.owner,
+		repo: view_params.repo,
+		issue_number: issue.number,
+		assignees: assignees,
+		headers: {
+			'X-GitHub-Api-Version': '2022-11-28'
+		}
+	})
+
+	return res.status == 201;
+}
+
+
+/**
+ * Remove assignees from an existing issue object
+ * @param octokit 
+ * @param view_params 
+ * @param issue 
+ * @param assignees 
+ */
+export async function api_remove_assignees_from_issue(octokit: Octokit, view_params: IssueViewParams, issue: Issue, assignees:string[]) {
+	if (view_params.repo == null) return;
+	const res = await octokit.request('DELETE /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
+		owner: view_params.owner,
+		repo: view_params.repo,
+		issue_number: issue.number,
+		assignees: assignees,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
 		}

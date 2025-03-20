@@ -80,7 +80,7 @@ This assumes that:
 -   Your tasks are tagged with #task.
 -   Product features which should not be synced yet can be tagged with #hidden (see below).
 -   The repo acessed with this (note/query) is named repo_name and owned by repo_owner.
--   The repo is used to develop products/components labelled with #Core, #Server and #User and also serves for overall platform development issues (#Repo, #PM).
+-   The repo is used to develop products/components labelled with #Core, #Server and #User and also serves for overall platform coordination issues (#Repo, #PM).
 -   The issues in this repo can also be related to #App and #Intelligence but those products/components are managed in separate (foreign) repos. Picking these labels will only remind of dependencies to other repos.
 -   Product tags without repo name are assumed to be managed in this repo.
 -   Manually create and color all product/component labels (local and foreign) in the Github repo.

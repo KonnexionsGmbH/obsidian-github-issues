@@ -28,7 +28,8 @@ import {
 import {
 	IssueItems, 
 	createBadTaskAlert, 
-	setViewParameters} from "./Elements/IssueItems";
+	setViewParameters,
+	setTaskStates } from "./Elements/IssueItems";
 	
 import {
 	MyTaskStatus, 
@@ -167,6 +168,7 @@ export default class MyPlugin extends Plugin {
 				const tasks_settings_data = fs.readFileSync(dataFilePath, "utf8");
 				const tasks_config = JSON.parse(tasks_settings_data);
 				this.task_states = tasks_config.statusSettings.customStatuses;
+				setTaskStates(this.task_states); // static in IssueItems
 				// console.log("this.task_states: ", this.task_states);
 					
 			} catch (error) {
@@ -183,7 +185,7 @@ export default class MyPlugin extends Plugin {
 
 				this.view_params = new IssueViewParams(source.split("\n").filter((row) => row.length > 0));
 
-				setViewParameters(this.view_params);
+				setViewParameters(this.view_params); // static in IssueItems
 
 				if (this.settings.show_searchbar) {
 					const searchfield = el.createEl("input");

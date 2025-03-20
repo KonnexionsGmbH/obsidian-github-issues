@@ -4,12 +4,14 @@ import { IssuesDetailsModal } from "./Modals/IssuesDetailsModal";
 import { App } from "obsidian";
 import { Octokit } from "@octokit/core";
 import { getTextColor } from "../Utils/Color.utils";
-import { api_get_issue_details, Label } from "src/API/ApiHandler";
+import { api_get_issue_details, api_add_assignees_to_issue, api_remove_assignees_from_issue } from "src/API/ApiHandler";
 import { IssueViewParams } from "src/main";
+import { MyTaskStatus } from "../Tasks/Tasks";
 
 export class IssueItems {
 
 	static view_params: IssueViewParams;
+	static task_states: MyTaskStatus[];
 
 	private static lastHighlightedIssue: HTMLElement | null = null;
 
@@ -19,7 +21,7 @@ export class IssueItems {
 	 * @param issue - the issue to append
 	 * @param reponame - the name of the repo the issue is in
 	 */
-	public static createDefaultIssueElement( el: HTMLElement, issue: Issue,
+	public static createDefaultIssueElement( el: HTMLElement, issue: Issue, 
 					repo_class_labels: ClassLabels, ocotokit: Octokit, app: App ) {
 
 		const container = el.createDiv({ cls: "issue-items-container" });
@@ -35,13 +37,13 @@ export class IssueItems {
 		detailsContainer.classList.add("issue-items-details-container");
 		// Create a single line container with space-between
 		const detailsLineContainer = detailsContainer.createSpan();
-		detailsLineContainer.classList.add("issue-details-info-line");
+		detailsLineContainer.classList.add("issue-items-info-line");
 		// Left group for author info
 		const authorGroup = detailsLineContainer.createSpan();
-		authorGroup.classList.add("issue-details-author-group");
+		authorGroup.classList.add("issue-items-author-group");
 		if (issue.is_pull_request) {
 			const prPill = authorGroup.createSpan({ text: "PR" });
-			prPill.classList.add("issue-details-pr-pill");
+			prPill.classList.add("issue-items-pr-pill");
 			prPill.style.backgroundColor = "rgba(205, 57, 23, 0.5)";
 			authorGroup.createSpan({text: `#${issue.number} created ${getPasteableTimeDelta(issue.created_at)} by ${issue.author}`});
 		} else {
@@ -94,7 +96,8 @@ export class IssueItems {
 					issue: Issue, repo_class_labels: ClassLabels, ocotokit: Octokit) {
 		container.style.opacity = "0.5";
 		this.highlightIssue(container);
-		const modal = new IssuesDetailsModal(app, issue, IssueItems.view_params, repo_class_labels, ocotokit);
+		const modal = new IssuesDetailsModal(app, issue, IssueItems.view_params, IssueItems.task_states, 
+							repo_class_labels, ocotokit);
 		modal.onClose = async () => {
 			await IssueItems.reloadIssue(container, parent, issue, ocotokit, app);
 		};
@@ -139,4 +142,8 @@ export function createBadTaskAlert( el: HTMLElement, bt: string) {
 
 export function setViewParameters(view_params: IssueViewParams) {
 	IssueItems.view_params = view_params;
+}
+
+export function setTaskStates(task_states: MyTaskStatus[]) {
+	IssueItems.task_states = task_states.filter((ts) => (ts.symbol == ts.symbol.toLowerCase()) && !("/-".contains(ts.symbol)));
 }
