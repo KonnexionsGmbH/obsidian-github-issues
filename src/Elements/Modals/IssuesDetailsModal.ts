@@ -375,8 +375,8 @@ export class IssuesDetailsModal extends Modal {
 		const descriptionPreview = descriptionContainer.createDiv();
 		descriptionPreview.classList.add("issue-details-description-preview");
 
-		let new_description = "" + this.issue.description;
-		if (!new_description.contains(details.body)) {
+		let new_description = this.issue.description;
+		if ((details.body) && (!new_description.contains(details.body))) {
 			new_description = new_description + "\n" + details.body;
 		}
 
@@ -419,7 +419,7 @@ export class IssuesDetailsModal extends Modal {
 			descriptionPreview.empty();
 			await MarkdownRenderer.render(
 				this.app,
-				descriptionInput.value,
+				descriptionInput.value ?? "",
 				descriptionPreview,
 				'',
 				new Component()

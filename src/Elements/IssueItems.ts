@@ -4,13 +4,12 @@ import { IssuesDetailsModal } from "./Modals/IssuesDetailsModal";
 import { App } from "obsidian";
 import { Octokit } from "@octokit/core";
 import { getTextColor } from "../Utils/Color.utils";
-import { api_get_issue_details, api_add_assignees_to_issue, api_remove_assignees_from_issue } from "src/API/ApiHandler";
+import { api_get_issue_details } from "src/API/ApiHandler";
 import { IssueViewParams } from "src/main";
 import { MyTaskStatus } from "../Tasks/Tasks";
 
 export class IssueItems {
 
-	static view_params: IssueViewParams;
 	static task_states: MyTaskStatus[];
 
 	private static lastHighlightedIssue: HTMLElement | null = null;
@@ -21,7 +20,7 @@ export class IssueItems {
 	 * @param issue - the issue to append
 	 * @param reponame - the name of the repo the issue is in
 	 */
-	public static createDefaultIssueElement( el: HTMLElement, issue: Issue, 
+	public static createDefaultIssueElement( el: HTMLElement, issue: Issue, view_params: IssueViewParams,
 					repo_class_labels: ClassLabels, ocotokit: Octokit, app: App ) {
 
 		const container = el.createDiv({ cls: "issue-items-container" });
@@ -78,7 +77,7 @@ export class IssueItems {
 		});
 
 		container.addEventListener("click", () => {
-			this.openIssueDetailsModal(app, container, el, issue, repo_class_labels, ocotokit);
+			this.openIssueDetailsModal(app, container, el, issue, view_params, repo_class_labels, ocotokit);
 		});
 	}
 
@@ -93,27 +92,27 @@ export class IssueItems {
 	}
 
 	private static openIssueDetailsModal(app: App, container: HTMLDivElement, parent: HTMLElement, 
-					issue: Issue, repo_class_labels: ClassLabels, ocotokit: Octokit) {
+					issue: Issue, view_params: IssueViewParams, repo_class_labels: ClassLabels, ocotokit: Octokit) {
 		container.style.opacity = "0.5";
 		this.highlightIssue(container);
-		const modal = new IssuesDetailsModal(app, issue, IssueItems.view_params, IssueItems.task_states, 
+		const modal = new IssuesDetailsModal(app, issue, view_params, IssueItems.task_states, 
 							repo_class_labels, ocotokit);
 		modal.onClose = async () => {
-			await IssueItems.reloadIssue(container, parent, issue, ocotokit, app);
+			await IssueItems.reloadIssue(container, parent, issue, view_params, ocotokit, app);
 		};
 		modal.open();
 	}
 
 	private static async reloadIssue(container: HTMLElement, parent: HTMLElement, 
-							issue: Issue, ocotokit: Octokit, app: App) {
-		const updatedIssueDetail = await api_get_issue_details(ocotokit, IssueItems.view_params, issue);
+							issue: Issue, view_params: IssueViewParams, ocotokit: Octokit, app: App) {
+		const updatedIssueDetail = await api_get_issue_details(ocotokit, view_params, issue);
 		if (updatedIssueDetail) {
 			if (updatedIssueDetail.state == "closed") {
 				console.log("removing #" + issue.number + " visibility in issue list");
 				container.empty();
 			} else {
-				issue.title = updatedIssueDetail.title;
-				issue.description = updatedIssueDetail.body;
+				issue.title = updatedIssueDetail.title ?? "";
+				issue.description = updatedIssueDetail.body ?? "";
 				// labels are updated on the issue object directly as the changes are not reflected in the issue object (from server) immediately
 				const titleEl = container.querySelector('.issue-items-title');
 				if (titleEl) {
@@ -140,9 +139,11 @@ export function createBadTaskAlert( el: HTMLElement, bt: string) {
 	title.classList.add("issue-items-title");
 }
 
+/*
 export function setViewParameters(view_params: IssueViewParams) {
 	IssueItems.view_params = view_params;
 }
+*/
 
 export function setTaskStates(task_states: MyTaskStatus[]) {
 	IssueItems.task_states = task_states.filter((ts) => (ts.symbol == ts.symbol.toLowerCase()) && !("/-".contains(ts.symbol)));

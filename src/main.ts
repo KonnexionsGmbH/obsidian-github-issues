@@ -28,7 +28,6 @@ import {
 import {
 	IssueItems, 
 	createBadTaskAlert, 
-	setViewParameters,
 	setTaskStates } from "./Elements/IssueItems";
 	
 import {
@@ -185,7 +184,7 @@ export default class MyPlugin extends Plugin {
 
 				this.view_params = new IssueViewParams(source.split("\n").filter((row) => row.length > 0));
 
-				setViewParameters(this.view_params); // static in IssueItems
+				// setViewParameters(this.view_params); // static in IssueItems
 
 				if (this.settings.show_searchbar) {
 					const searchfield = el.createEl("input");
@@ -371,6 +370,7 @@ export default class MyPlugin extends Plugin {
 					IssueItems.createDefaultIssueElement(
 						el,
 						issue,
+						this.view_params,
 						repo_class_labels,
 						this.octokit,
 						this.app,
