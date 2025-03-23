@@ -138,21 +138,21 @@ export class IssuesDetailsModal extends Modal {
 				assigneeContainer.classList.remove('issue-findings');
 				assignees_in_sync = true;
 			} else {
-				assignee_text = `Assigned to ${logins}. Re-assign to ${this.issue.assignees[0]}`;
+				assignee_text = `Assigned to ${logins}}`;
 				assigneeIcon.src = details.assignees[0].avatar_url;
 				assigneeContainer.classList.add('issue-findings');
 			}
 		} else if ((this.issue.assignees.length) && (this.issue.assignees.contains("*"))) {
-			assignee_text = `Assignable to ${this.issue.assignees.join("+")}`;
+			assignee_text = `Unassigned, assignable to ${this.issue.assignees.join("+")}`;
 			assigneeContainer.classList.remove('issue-findings');
 		} else if (this.issue.assignees.length) {
-			assignee_text = `Assign to ${this.issue.assignees[0]}`;
+			assignee_text = `Unassigned, assign to ${this.issue.assignees[0]}`;
 			assigneeContainer.classList.add('issue-findings');
 		} else if (details.assignees.length) {
-			assignee_text = `Unassign ${details.assignees[0].login}`;
+			assignee_text = `Unassign ${details.assignees.map(a => a.login).join("+")}`;
 			assigneeContainer.classList.add('issue-findings');
 		} else {
-			assignee_text = 'not assigned';
+			assignee_text = 'Unassigned';
 			assigneeContainer.classList.remove('issue-findings');
 			assignees_in_sync = true;
 		}
@@ -169,6 +169,12 @@ export class IssuesDetailsModal extends Modal {
             if (t1 < t2) return -1;
             return 0;
         });
+		details.assignees.forEach((a) => {
+			if (!allAssignees.contains(a.login)) {
+				allAssignees.push(a.login);
+			}
+		});
+
 		if (allAssignees.length > 0) {
 			const originalAssignees = new Set(details.assignees.map(a => a.login));
 			const proposedAssignees = new Set(this.issue.assignees.filter(a => a != "*"));
@@ -300,13 +306,14 @@ export class IssuesDetailsModal extends Modal {
 		if (this.view_params != null) {
 			const allLabels = this.repo_class_labels;
 			const originalSelections = new Set(details.labels.map(label => label.name));
+			const newLabels = new Set(allProperLabels(this.issue.cls).map((l) => l.name));
 			const checkboxes: HTMLInputElement[] = [];
 
-			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.feature_labels, checkboxes);
-			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.priority_labels, checkboxes);
-			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.other_labels, checkboxes);
-			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.foreign_labels, checkboxes);
-			this.appendLabelCheckboxes(labelsGrid, originalSelections, allLabels.product_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, newLabels, allLabels.feature_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, newLabels, allLabels.priority_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, newLabels, allLabels.other_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, newLabels, allLabels.foreign_labels, checkboxes);
+			this.appendLabelCheckboxes(labelsGrid, newLabels, allLabels.product_labels, checkboxes);
 
 			const saveLabelsButton = contentEl.createEl("button", { text: "Save Labels" });
 			saveLabelsButton.classList.add("issue-details-save-button");
