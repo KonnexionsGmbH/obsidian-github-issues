@@ -554,7 +554,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
 
         let findings: string[] = [];
         
-        // issue has one feature and at least one product label, maybe we can sync it with tasks
+        // issue has one feature and at least one product label, maybe we can link it to a task
         const i_feature = issue.cls.feature_labels[0].name;  // issue has a feature label
         const i_id = issue.cls.iid_labels[0].name;           // issue id
         let t_id = "";
@@ -579,7 +579,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                             if ( !t_task.cts.tid_tokens.length && !issue.cls.tid_labels.length ) {
                                 // ok, no task id linking possible
                             } else if ( t_task.cts.tid_tokens.length && !issue.cls.tid_labels.length ) {
-                                issue.description = "synced to task " + t_task.cts.tid_tokens[0] + "\n" + issue.description;
+                                issue.description = "synced to task " + t_task.cts.tid_tokens[0] + "\n\n" + issue.description;
                                 findings.push("Proposing to add a task ID link to issue description.");
                             } else if ( !t_task.cts.tid_tokens.length && issue.cls.tid_labels.length ) {
                                 if (set_ids.has(issue.cls.tid_labels[0].name)) {
@@ -590,17 +590,36 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                             } else if ( t_task.cts.tid_tokens[0] != issue.cls.tid_labels[0].name ){ 
                                 findings.push('Task ID does not match the link in issue description.');
                             };
-                            if (t_task.title != issue.title) {
-                                findings.push('Task title does not match the issue title.');
+                            if ((t_task.title != issue.title) && (t_id)) {
+                                findings.push(`Consider copying the task ${t_id} title to the issue title:`);
+                                findings.push(t_task.title);
+                            } else if ((t_task.title != issue.title) && (i_id)) {
+                                findings.push(`Consider copying the task ${i_id} title to the issue title:`);
+                                findings.push(t_task.title);
+                            } else if (t_task.title != issue.title) {
+                                findings.push(`Consider copying the task title to the issue title:`);
+                                findings.push(t_task.title);
                             };
                             if ((issue.assignees.length == 0) && (t_task.status_code == " ")) {
-                                // unassigned, ok 
+                                // unassigned, ok
+                            } else if (issue.assignees.length == 0) {
+                                issue.assignees = [loginFromStatus(t_task.status_code, task_states)];
+                                findings.push(`Proposing to assignin issue to ${issue.assignees[0]}.`);
+                            } else if (t_task.status_code == " ") {
+                                issue.assignees = [];
+                                findings.push(`Proposing to de-assignin the issue.`);
                             } else if (!issue.assignees.contains(loginFromStatus(t_task.status_code, task_states))) {
-                                const assignee_list = issue.assignees.join("+");
-                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignees [${assignee_list}].`);
+                                issue.assignees = [loginFromStatus(t_task.status_code, task_states)].concat(issue.assignees);
+                                findings.push(`Proposing to add ${issue.assignees[0]} to existing issue assignees.`);
                             };
                             if (t_task.cts.product_tokens.join() != issue.cls.product_labels.map(label => label.name).join()) {
-                                findings.push("Task product tags don't match issue product labels.");
+                                issue.cls.product_labels = t_task.cts.product_tokens.map((name) => {
+                                            return {
+                                                name: name,
+                                                color: "#999999"  // irrelevant
+                                            } as Label;
+                                        });
+                                findings.push("Proposing to pick issue product labels from task product tags.");
                             };
                             break;                    
                         }
@@ -620,7 +639,6 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                 issue.findings = findings;
             }
         } else if (set_ids.has(t_id)) {
-            console.log(t_id);
             // matching task Id exists but issue ID is not yet synced back
             for (let f = 0; f < facc.length; f++) {
                 if (facc[f].tag == i_feature) {
@@ -633,7 +651,7 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                             t_task = facc[f].tasks[t];
                             t_found = true;
                             if (t_task.title != issue.title) {
-                                findings.push(`Task ${t_id} title does not match issue ${i_id} title.`);
+                                findings.push(`Consider copying the task ${t_id} title to the issue title.`);
                             } else {
                                 // add the i_id token to the task
                                 editor.setSelection({ line: t_task.start, ch: 0 }, { line: t_task.start+1, ch: 0 });
@@ -652,12 +670,24 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
                             };
                             if ((issue.assignees.length == 0) && (t_task.status_code == " ")) {
                                 // unassigned, ok 
-                            } else if (!issue.assignees.contains(loginFromStatus(t_task.status_code,task_states))) {
-                                const assignee_list = issue.assignees.join("+");
-                                findings.push(`Task status code [${t_task.status_code}] does not match issue assignees [${assignee_list}].`);
+                            } else if (issue.assignees.length == 0) {
+                                issue.assignees = [loginFromStatus(t_task.status_code, task_states)];
+                                findings.push(`Proposing to assignin issue to ${issue.assignees[0]}.`);
+                            } else if (t_task.status_code == " ") {
+                                issue.assignees = [];
+                                findings.push(`Proposing to de-assignin the issue.`);
+                            } else if (!issue.assignees.contains(loginFromStatus(t_task.status_code, task_states))) {
+                                issue.assignees = [loginFromStatus(t_task.status_code, task_states)].concat(issue.assignees);
+                                findings.push(`Proposing to add ${issue.assignees[0]} to existing issue assignees.`);
                             };
                             if (t_task.cts.product_tokens.join() != issue.cls.product_labels.map(label => label.name).join()) {
-                                findings.push("Task product tags don't match issue product labels.");
+                                issue.cls.product_labels = t_task.cts.product_tokens.map((name) => {
+                                            return {
+                                                name: name,
+                                                color: "#999999"  // irrelevant
+                                            } as Label;
+                                        });
+                                findings.push("Proposing to pick issue product labels from task product tags.");
                             };
                             break;                    
                         }
@@ -683,8 +713,8 @@ export function issueToTaskSync(issue: Issue, view_params:IssueViewParams, edito
             new Notice(`Syncing issue ${i_id} to tasks had one finding.`);
 
         } else {   
-            // no task with this id exists, we assume that it was created on GitHub and
-            // insert it into the ReleasesNote under its feature (if that exists there)
+            // No task with either i_id or t_id exists. We assume that it was created on GitHub and
+            // insert it into the ReleasesNote under its feature (if that exists and is not hidden)
             let t_start = -1;     // editor line number where task is to be inserted
             for (let f = 0; f < facc.length; f++) {
                 if ((t_start == -1) && (facc[f].tag == i_feature)) { 
@@ -779,8 +809,6 @@ export async function taskToIssueSync(task: Task, octokit: Octokit, view_params:
         user: string, task_states: MyTaskStatus[], set_ids: Set<string>) {
 
     const status_obsolete = "xX-";
-
-    const logins = ['c-bik','bojanbg','stoch','loydhook','walter-weinmann'];
 
     if (task.cts.iid_tokens.length == 1) {
 

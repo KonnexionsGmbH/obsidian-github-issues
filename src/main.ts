@@ -132,8 +132,13 @@ export default class MyPlugin extends Plugin {
 		await this.loadSettings();
 		this.git_user = process.env.GIT_USER;
 		this.git_pat = process.env.GIT_PAT;
-		// console.log("GIT_USER: ", this.git_user);
-		// console.log("GIT_PAT: ", this.git_pat);
+		if (this.git_user && this.git_pat) {
+			console.log('Loading with credential defaults in environment.')
+			// console.log("GIT_USER: ", this.git_user);
+			// console.log("GIT_PAT: ", this.git_pat);
+		} else {
+			console.log('Loading without credential defaults in environment.')
+		}
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new GithubIssuesSettings(this.app, this));
@@ -171,10 +176,14 @@ export default class MyPlugin extends Plugin {
 				// console.log("this.task_states: ", this.task_states);
 					
 			} catch (error) {
-				console.log("Cannot find Tasks plugin settings: ", error);				
+				const msg = "Cannot find Tasks plugin custom settings";
+				new Notice(msg);
+				console.log(msg, error);
 			}
 		} else {
-			console.log("Cannot access file system and Tasks plugin config");				
+			const msg = "Cannot access file system and Tasks plugin config";
+			new Notice(msg);
+			console.log(msg);
 		}
 
 		//register markdown post processor
@@ -182,9 +191,8 @@ export default class MyPlugin extends Plugin {
 			"github-issues",
 			async (source, el) => {
 
+				const plugin_init = !this.view_params;  // first call in OnLoad() -> do not synchronize
 				this.view_params = new IssueViewParams(source.split("\n").filter((row) => row.length > 0));
-
-				// setViewParameters(this.view_params); // static in IssueItems
 
 				if (this.settings.show_searchbar) {
 					const searchfield = el.createEl("input");
@@ -283,24 +291,25 @@ export default class MyPlugin extends Plugin {
 							new Notice("New label creation failed :" + name);
 						}
 					});
-
-					if (this.view_params.product_tokens.length == 1) {
-						// this repo has only one product, we can assume this product label for all issues
-						const product_color = repo_class_labels.product_labels.find(l => l.name == this.view_params.product_tokens[0])?.color;
-						for (let i = 0; i < issues.length; i++) {
-							if (issues[i].cls.product_labels.length == 0) {
-								issues[i].cls.product_labels.push({ name: this.view_params.product_tokens[0], color: product_color } as Label);
-								const selectedTokens = allProperLabels(issues[i].cls).map((label) => label.name) ;
-								const updated = await api_set_labels_on_issue(this.octokit, this.view_params, issues[i], selectedTokens);
-								if (updated) {
-									new Notice("Default label updated");
-								} else {
-									new Notice("Could not update default label");
-								}	
-							}
-						}					
+					if (!plugin_init) {
+						if (this.view_params.product_tokens.length == 1) {
+							// this repo has only one product, we can assume this product label for all issues
+							const product_color = repo_class_labels.product_labels.find(l => l.name == this.view_params.product_tokens[0])?.color;
+							for (let i = 0; i < issues.length; i++) {
+								if (issues[i].cls.product_labels.length == 0) {
+									issues[i].cls.product_labels.push({ name: this.view_params.product_tokens[0], color: product_color } as Label);
+									const selectedTokens = allProperLabels(issues[i].cls).map((label) => label.name) ;
+									const updated = await api_set_labels_on_issue(this.octokit, this.view_params, issues[i], selectedTokens);
+									if (updated) {
+										new Notice("Default label updated");
+									} else {
+										new Notice("Could not update default label");
+									}	
+								}
+							}					
+						}
 					}
-	
+
 					const [bad_tasks_alerts, set_ids, set_titles] = collectBadTaskAlerts(facc, this.view_params);
 
 					console.log("bad_tasks_alerts: ", bad_tasks_alerts);
@@ -316,14 +325,16 @@ export default class MyPlugin extends Plugin {
 
 						let iids: string[] = [];
 						for (let i=0; i < issues.length; i++) {
-							issueToTaskSync(issues[i], this.view_params, editor, facc, this.task_states, set_ids, set_titles);
-							iids.push("#" + issues[i].number); // index for taskToIssueSync
+							if (!plugin_init) {
+								issueToTaskSync(issues[i], this.view_params, editor, facc, this.task_states, set_ids, set_titles);
 
-							/* to be implemented
-							if (issues[i].cls.foreign_labels.length > 0) {
-								issueToForeignTaskSync(issues[i], view_params, editor, facc, set_ids, set_titles);
+								/* to be implemented
+								if (issues[i].cls.foreign_labels.length > 0) {
+									issueToForeignTaskSync(issues[i], view_params, editor, facc, set_ids, set_titles);
+								}
+								*/
 							}
-							*/
+							iids.push("#" + issues[i].number); // index for taskToIssueSync
 						}
 						sortAndPruneTasksNote( editor, facc, this.view_params);
 						console.log("facc after issueToTaskSync/sort");
@@ -335,16 +346,18 @@ export default class MyPlugin extends Plugin {
 									let task = facc[f].tasks[t];
 									if (task.cts.product_tokens.length > 0) {
 										// task refers to this repo
-										await taskToIssueSync(task, this.octokit, this.view_params, editor, issues, 
-											iids, bad_tasks_alerts, this.settings.username, this.task_states, set_ids);
+										if (!plugin_init) {
+											await taskToIssueSync(task, this.octokit, this.view_params, editor, issues, 
+												iids, bad_tasks_alerts, this.settings.username, this.task_states, set_ids);
+										}
 									}
 								}
 							}
 						}
-
-						console.log("facc after taskToIssueSync");
-						console.log(structuredClone(facc));
-
+						if (!plugin_init) {
+							console.log("facc after taskToIssueSync");
+							console.log(structuredClone(facc));
+						}
 						if (bad_tasks_alerts.length > 0) {
 							const bt = 'The synchronisation from Obsidian to GitHub failed (at least partially). Please check the following findings.';
 							createBadTaskAlert(el, bt);
