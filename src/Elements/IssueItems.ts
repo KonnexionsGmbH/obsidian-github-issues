@@ -77,7 +77,7 @@ export class IssueItems {
 		});
 
 		container.addEventListener("click", () => {
-			this.openIssueDetailsModal(app, container, el, issue, view_params, repo_class_labels, ocotokit);
+			this.openIssueDetailsModal(app, container, el, issue, repo_class_labels, ocotokit);
 		});
 	}
 
@@ -92,20 +92,20 @@ export class IssueItems {
 	}
 
 	private static openIssueDetailsModal(app: App, container: HTMLDivElement, parent: HTMLElement, 
-					issue: Issue, view_params: IssueViewParams, repo_class_labels: ClassLabels, ocotokit: Octokit) {
+					issue: Issue, repo_class_labels: ClassLabels, ocotokit: Octokit) {
 		container.style.opacity = "0.5";
 		this.highlightIssue(container);
-		const modal = new IssuesDetailsModal(app, issue, view_params, IssueItems.task_states, 
+		const modal = new IssuesDetailsModal(app, issue, IssueItems.task_states, 
 							repo_class_labels, ocotokit);
 		modal.onClose = async () => {
-			await IssueItems.reloadIssue(container, parent, issue, view_params, ocotokit, app);
+			await IssueItems.reloadIssue(container, parent, issue, ocotokit, app);
 		};
 		modal.open();
 	}
 
 	private static async reloadIssue(container: HTMLElement, parent: HTMLElement, 
-							issue: Issue, view_params: IssueViewParams, ocotokit: Octokit, app: App) {
-		const updatedIssueDetail = await api_get_issue_details(ocotokit, view_params, issue);
+							issue: Issue, ocotokit: Octokit, app: App) {
+		const updatedIssueDetail = await api_get_issue_details(ocotokit, issue);
 		if (updatedIssueDetail) {
 			if (updatedIssueDetail.state == "closed") {
 				console.log("removing #" + issue.number + " visibility in issue list");

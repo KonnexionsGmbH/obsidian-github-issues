@@ -118,10 +118,12 @@ export class Issue {
 	assignees: string[];
 	cls: ClassLabels;
 	is_pull_request: boolean;
+	view_params: IssueViewParams;
 	sort_string: string = "";
 	findings: string[] = [];
 
-	constructor(t: string, d: string, a: string, n: number, created_at: string, assignees: string[], cls: ClassLabels, is_pull_request = false) {
+	constructor(t: string, d: string, a: string, n: number, created_at: string, assignees: string[], 
+					cls: ClassLabels, is_pull_request = false, view_params: IssueViewParams) {
 		this.title = t;
 		this.description = d;
 		this.author = a;
@@ -130,6 +132,7 @@ export class Issue {
 		this.created_at = created_at;
 		this.cls = cls;
 		this.is_pull_request = is_pull_request;
+		this.view_params = view_params;
 	}
 }
 

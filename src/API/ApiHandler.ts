@@ -117,7 +117,8 @@ export async function api_submit_issue(octokit: Octokit, view_params: IssueViewP
 				res.data.created_at,
 				res.data.assignees?.map(a => a.login) ?? [],
 				tl,
-				false
+				false,
+				view_params
 			)];
 	} else {
 		return [];
@@ -168,7 +169,8 @@ export async function api_get_own_issues(octokit: Octokit, view_params: IssueVie
 				issue.created_at,
 				logins,
 				tl,
-				(issue.pull_request != undefined)
+				(issue.pull_request != undefined),
+				view_params
 			));
 		}
 
@@ -230,12 +232,13 @@ export async function api_get_issue_by_number(octokit: Octokit, view_params: Iss
  * @param octokit
  * @param issue
  */
-export async function api_get_issue_details(octokit: Octokit, view_params: IssueViewParams, issue: Issue) {
-	if (view_params.repo == null) return;
+export async function api_get_issue_details(octokit: Octokit, issue: Issue) {
+
+	if (issue.view_params.repo == null) return;
 
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}', {
-		owner: view_params.owner,
-		repo: view_params.repo,
+		owner: issue.view_params.owner,
+		repo: issue.view_params.repo,
 		issue_number: issue.number,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
@@ -361,12 +364,12 @@ export async function api_remove_assignees_from_issue(octokit: Octokit, view_par
  * @param issue
  * @param toBeUpdated
  */
-export async function api_update_issue(octokit: Octokit, view_params: IssueViewParams, issue: Issue, toBeUpdated: unknown) {
-	if (view_params.repo == null) return;
+export async function api_update_issue(octokit: Octokit, issue: Issue, toBeUpdated: unknown) {
+	if (issue.view_params.repo == null) return;
 
 	const options = {
-		owner: view_params.owner,
-		repo: view_params.repo,
+		owner: issue.view_params.owner,
+		repo: issue.view_params.repo,
 		issue_number: issue.number,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'
@@ -385,11 +388,11 @@ export async function api_update_issue(octokit: Octokit, view_params: IssueViewP
  * @param octokit
  * @param issue
  */
-export async function api_get_issue_comments(octokit: Octokit, view_params: IssueViewParams, issue: Issue) {
-	if (view_params.repo == null) return;
+export async function api_get_issue_comments(octokit: Octokit, issue: Issue) {
+	if (issue.view_params.repo == null) return;
 	const res = await octokit.request('GET /repos/{owner}/{repo}/issues/{issue_number}/comments', {
-		owner: view_params.owner,
-		repo: view_params.repo,
+		owner: issue.view_params.owner,
+		repo: issue.view_params.repo,
 		issue_number: issue.number,
 		headers: {
 			'X-GitHub-Api-Version': '2022-11-28'

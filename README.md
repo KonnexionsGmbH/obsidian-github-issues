@@ -13,16 +13,17 @@ Obsidian GitHub Issues is a plugin for the Obsidian note-taking app that enables
 -   **Issue syncing to tasks:** Embed existing GitHub issues into your Obsidian note (the release plan). This allows you to reference and view relevant issues alongside your notes.
 -   **Create new issues from tasks:** Easily create new Obsidian tasks and push them to GitHub as issues without leaving the Obsidian app. This feature streamlines your workflow by eliminating the need to switch between applications.
 -   **Edit existing issues:** Edit and update existing GitHub issues directly from within Obsidian in a query-view per repo. You can read comments, change the issue title or body, change assignees and assigned labels, append comments and close the issue without having to navigate to GitHub.
--   **Bidirectional sync:** Changes made to tasks in Obsidian are automatically (or semi-automatically) synchronized with the corresponding GitHub issues, ensuring seamless collaboration between your Obsidian notes and multiple GitHub repositories. This happens only for repos which have their query-view open in the Obsidian workspace andonly on query-refresh. Shape or re-structure your release plan with GitHub query views closed.
+-   **Bidirectional sync:** Changes made to tasks in Obsidian are automatically (or semi-automatically) synchronized with the corresponding GitHub issues, ensuring seamless collaboration between your Obsidian notes and multiple GitHub repositories. This happens only for repos which have their query-view open in the Obsidian workspace and only on query-refresh. Shape or re-structure your release plan with GitHub query notes closed.
 -   **Rich preview:** View a comprehensive preview of the embedded issues, including their status, comments, assignees, labels, and other relevant details. This feature helps you quickly gain context and stay informed about the progress of your issues.
 
 ## Installation
 
 -   Install, enable and configure the Tasks plugin. Configure two custom tasks states per co-worker (e.g.):
    [a] for "alex_avatar assigned"  and
-   [A] for "alex_avatar working"  etc.  
+   [A] for "alex_avatar working"  etc.
+   Put the GitHub login of the person first, then a space. The rest of the text is technically ignored. Instead of 'working', one could twist the meaning and choose 'completed'. This would make sense if one wanted to keep the issue in the query and in the sync process until all other tasks in the group are also completed (and then can be closed at once).
    
-   This will allow to mark tasks as being worked on but this information is not forwarded to GitHub. The sync process only makes sure that the assigned person is among the assignees in GitHub.
+   Two task states will allow two levels of assignment/work in progress but this information is not forwarded to GitHub. The sync process only makes sure that the assigned person is among the assignees in GitHub.
 
 ### Prerequisites
 
