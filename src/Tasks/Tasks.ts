@@ -127,7 +127,6 @@ export class Feature {
  * @param label
  */
 function prioTokenFromLabel(label: Label): string {
-    const prios = "⏬🔽🔼⏫🔺";		// prio0 .. prio4
     const idx = prioFromName(label.name);
     switch  (idx) {
 		case 0: { return "⏬"; break;};
@@ -144,16 +143,15 @@ function prioTokenFromLabel(label: Label): string {
  * @param token
  */
 function prioNameFromToken(token: string): string {
-    const names = [ 'p_backlog', 'p_low', 'p_high', 'p_highest', 'p_critical' ];
-    const tokens = "⏬🔽🔼⏫🔺";
-    const idx = tokens.indexOf(token);
-    if (idx > -1) {
-        return names[idx];
-    } else {
-        return "p_not_found";
+    switch  (token) {
+		case "⏬": { return 'p_backlog' ; break;};
+		case "🔽": { return 'p_low' ; break;};
+		case "🔼": { return 'p_high'; break;};
+		case "⏫": { return 'p_highest' ; break;};
+		case "🔺": { return 'p_critical'; break;};
+        default: {return 'p_critical'; break;}
     }
 }
-
 
 /**
  * Constructs a string which can be used to sort tasks by feature, title, products, IssueId
